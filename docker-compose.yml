@@ -1,0 +1,108 @@
+# version: '3.9'
+# services:
+#   postgres:
+#     image: postgres:17.5-alpine
+#     environment:
+#       POSTGRES_DB: orisun
+#       POSTGRES_USER: postgres
+#       POSTGRES_PASSWORD: postgres
+#       POSTGRES_PORT: 5432
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U postgres"]
+#       interval: 2s
+#       timeout: 5s
+#       retries: 10
+#     # ports:
+#     #   - "5432:5432"
+
+#   orisun:
+#     image: orexza/orisun:latest
+#     environment:
+#       ORISUN_PG_HOST: postgres
+#       ORISUN_PG_PORT: 5432
+#       ORISUN_PG_USER: postgres
+#       ORISUN_PG_PASSWORD: postgres
+#       ORISUN_PG_NAME: orisun
+#       ORISUN_PG_SCHEMAS: "orisun_test_1:public,orisun_admin:admin"
+#       ORISUN_BOUNDARIES: '[{"name":"orisun_test_1","description":"test boundary"},{"name":"orisun_admin","description":"admin boundary"}]'
+#       ORISUN_ADMIN_BOUNDARY: orisun_admin
+#     ports:
+#       - "5005:5005"  # gRPC API
+#     depends_on:
+#       - postgres
+
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    container_name: orisun_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: orisun
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+    networks:
+      - orisun_net
+    # ports:
+    #   - "5434:5432"
+
+  orisun:
+    image: orexza/orisun:latest
+    container_name: orisun_app
+    restart: unless-stopped
+    environment:
+      ORISUN_PG_HOST: postgres
+      ORISUN_PG_PORT: 5432
+      ORISUN_PG_USER: postgres
+      ORISUN_PG_PASSWORD: postgres
+      ORISUN_PG_NAME: orisun
+      ORISUN_PG_SCHEMAS: "orisun_test_1:public,orisun_admin:admin"
+      ORISUN_BOUNDARIES: '[{"name":"orisun_test_1","description":"test boundary"},{"name":"orisun_admin","description":"admin boundary"}]'
+      ORISUN_ADMIN_BOUNDARY: orisun_admin
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/orisun
+
+      # NATS / EventStore (internal to Orisun)
+      ORISUN_NATS_HOST: orisun  # <-- use service name (self-reference)
+      ORISUN_NATS_PORT: 4224
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5005:5005" # gRPC API
+      - "4224:4224"
+    networks:
+      - orisun_net
+
+  kccf_ministry:
+    image: postgres:17.5-alpine
+    container_name: kccf_ministry
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kccf_ministry_db
+      POSTGRES_USER: kccf_admin
+      POSTGRES_PASSWORD: kccfadmin@123.
+    volumes:
+      - pg_kccf_ministry_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # optional: exposed to host
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kccf_admin -d kccf_ministry_db"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+    networks:
+      - orisun_net
+
+volumes:
+  postgres_data:
+  pg_kccf_ministry_data:
+
+networks:
+  orisun_net:
+    driver: bridge
