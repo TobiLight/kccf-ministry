@@ -40,6 +40,30 @@ You need access to:
 - **PostgreSQL database**
 - **NATS server** (default: localhost:4224, already runs with Orisun)
 
+### Docker Compose
+
+The complete development stack can be started with:
+
+```bash
+docker compose up --build
+```
+
+This starts the Bun application, both PostgreSQL databases, Orisun, its embedded NATS server, and the database migration service. The app is available at `http://localhost:3000`, Orisun at `localhost:5005`, and NATS at `localhost:4224`.
+
+To run the production-style app image without source mounting:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
+```
+
+The Compose environment uses local defaults for development. Override them with `ORISUN_USERNAME`, `ORISUN_PASSWORD`, `ORISUN_BOUNDARY`, or `SESSION_SECRET` when needed. Seeding is not run automatically because `bun run db:seed` removes existing users.
+
+To stop the services and remove their persistent data:
+
+```bash
+docker compose down -v
+```
+
 ### Environment Configuration
 
 Create a `.env` file with the following variables:

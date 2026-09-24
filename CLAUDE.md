@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Development Server
 - `bun run dev` - Start development server with hot reload on port 3000
 - `bun run build` - Build for production 
-- `bun run start` - Start production server (runs on port 3011)
+- `bun run start` - Start production server on the configured `PORT` (default: 3000)
 - `bun run type-check` - Run TypeScript compiler in watch mode
 
 ### Database Operations

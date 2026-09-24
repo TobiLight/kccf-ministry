@@ -1,0 +1,13 @@
+services:
+  migrate:
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+    volumes: !reset []
+
+  app:
+    command: ["bun", "run", "start"]
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+    volumes: !reset []

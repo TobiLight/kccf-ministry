@@ -8,7 +8,7 @@
         "@nats-io/jetstream": "^3.2.0",
         "@nats-io/kv": "^3.2.0",
         "@nats-io/transport-node": "^3.2.0",
-        "@orisun/eventstore-client": "github:oexza/orisun-node-client",
+        "@orisun/eventstore-client": "https://codeload.github.com/oexza/orisun-node-client/tar.gz/5eadf7e79bccc73a4607c7d327373ef825819c5d",
         "@types/pg": "^8.16.0",
         "charts.css": "^1.2.0",
         "drizzle-orm": "^0.45.1",
@@ -70,7 +70,7 @@
 
     "@nats-io/transport-node": ["@nats-io/transport-node@3.2.0", "", { "dependencies": { "@nats-io/nats-core": "3.2.0", "@nats-io/nkeys": "2.0.3", "@nats-io/nuid": "2.0.3" } }, ""],
 
-    "@orisun/eventstore-client": ["@orisun/eventstore-client@git+ssh://git@github.com/oexza/orisun-node-client.git#5eadf7e79bccc73a4607c7d327373ef825819c5d", { "dependencies": { "@grpc/grpc-js": "^1.10.6", "@grpc/proto-loader": "^0.7.10", "google-protobuf": "^3.21.2" } }, "5eadf7e79bccc73a4607c7d327373ef825819c5d"],
+    "@orisun/eventstore-client": ["@orisun/eventstore-client@https://codeload.github.com/oexza/orisun-node-client/tar.gz/5eadf7e79bccc73a4607c7d327373ef825819c5d", { "dependencies": { "@grpc/grpc-js": "^1.10.6", "@grpc/proto-loader": "^0.7.10", "google-protobuf": "^3.21.2" } }, "sha512-CWFokHXlk8LO5do7tv3dWFBV1Nm8y38pUz5vxmXuiMWTjoiUrJBD5Y1pJRBaZsWUI64nSPEgvoqHg2cgkAUt+Q=="],
 
     "@parcel/watcher": ["@parcel/watcher@2.5.1", "", { "dependencies": { "detect-libc": "^1.0.3", "is-glob": "^4.0.3", "micromatch": "^4.0.5", "node-addon-api": "^7.0.0" }, "optionalDependencies": { "@parcel/watcher-darwin-arm64": "2.5.1" } }, ""],
 
