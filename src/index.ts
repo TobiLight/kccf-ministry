@@ -1,114 +1,43 @@
-// Main Hono app entry point
 import { Hono } from "hono";
-import { logger as honoLogger } from "hono/logger";
-import { configureRoutes } from "./routes";
-import { PostgresEventHandlerCheckpointer } from "~/event-sourcing-utils/postgres-event-handler-checkpointer";
-import { db, initializeDatabase } from "~/db";
-import {
-    OrisunEventsSubscriber,
-    OrisunEventRetriever,
-    OrisunEventSaver
-} from '~/event-sourcing-utils/orisun-event-sourcing';
-import { createNatsConnection } from "~/nats/nats";
-import { Publisher, Subscriber, Subscription } from "~/event-sourcing-utils/types";
-import { createModuleLogger } from "~/utils/logger";
-import { orisunClient } from '~/event-sourcing-utils/orisun'
-import { Subscription as NatsSubscription } from "@nats-io/transport-node";
+import { secureHeaders } from "hono/secure-headers";
 import { serveStatic } from "hono/bun";
+import { configureRoutes } from "./routes";
 
-await orisunClient.healthCheck().catch(reason => process.exit(reason));
+export function createApp(): Hono {
+  const app = new Hono();
 
-const logger = createModuleLogger("main");
+  app.use(
+    "*",
+    secureHeaders({
+      contentSecurityPolicy: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-eval'"],
+        scriptSrcAttr: ["'none'"],
+        styleSrc: ["'self'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        objectSrc: ["'none'"],
+      },
+      referrerPolicy: "strict-origin-when-cross-origin",
+      xContentTypeOptions: "nosniff",
+      xFrameOptions: "DENY",
+    }),
+  );
 
-const server = new Hono();
+  app.use("/static/*", serveStatic({ root: "./" }));
 
-const port = process.env.PORT || 3000;
-const ORISUN_BOUNDARY = process.env.ORISUN_BOUNDARY || "";
-
-async function startServer() {
-    // Initialize database
-    await initializeDatabase();
-
-    // Initialize NATS connection
-    const nc = await createNatsConnection();
-
-    // Initialize checkpointer
-    new PostgresEventHandlerCheckpointer(db);
-
-    // Initialize event store client, subscriber, retriever and saver
-    const orisunEventsSubscriber = new OrisunEventsSubscriber(orisunClient, ORISUN_BOUNDARY);
-    const orisunEventRetriever = new OrisunEventRetriever(orisunClient, ORISUN_BOUNDARY);
-    const orisunEventSaver = new OrisunEventSaver(orisunClient, ORISUN_BOUNDARY);
-
-    // create nats publisher
-    const natsPulisher: Publisher = {
-        publish: async (subject: string, data: any) => {
-            const stringData = JSON.stringify(data)
-
-            nc.publish(subject, stringData);
-
-            if (logger.isDebugEnabled()) {
-                logger.debug(`published event ${stringData} for subject: ${subject}`);
-            }
-        }
-    };
-
-    // create nats subscriber
-    const natsSubscriber: Subscriber = {
-        subscribe: (subject: string, onMessage: (data: any) => void): Promise<Subscription> => {
-            let sub: NatsSubscription
-
-            function doSubscribe() {
-                sub = nc.subscribe(subject);
-                (async () => {
-                    for await (const msg of sub) {
-                        const data = JSON.parse(new TextDecoder().decode(msg.data));
-                        onMessage(data);
-                        if (logger.isDebugEnabled()) {
-                            logger.debug(`received event ${JSON.stringify(data)} for subject: ${subject}`);
-                        }
-                    }
-                })().catch(reason => {
-                    logger.error(reason);
-                    sub = doSubscribe()
-                });
-                return sub;
-            }
-
-            doSubscribe()
-
-            return Promise.resolve({
-                close: async () => {
-                    if (logger.isDebugEnabled()) {
-                        logger.debug(`unsubscribed from subject: ${subject}`);
-                    }
-                    sub.unsubscribe()
-                }
-            })
-        }
-    };
-
-    server.use(
-        "/static/*",
-        serveStatic({ root: "./" })
-    );
-
-    // Add logger middleware
-    server.use("*", honoLogger());
-
-    // Mount routes
-    server.route("/", configureRoutes(orisunEventRetriever, orisunEventSaver, natsSubscriber, db));
-
-    console.log(`Starting server on http://localhost:${port}`);
+  return configureRoutes(app);
 }
 
-startServer().catch(reason => {
-    console.error("Failed to start server:", reason);
-    process.exit(1);
-})
+export const app = createApp();
+
+const port = Number(process.env.PORT ?? 3000);
 
 export default {
-    port,
-    fetch: server.fetch,
+  port,
+  fetch: app.fetch,
 };
-

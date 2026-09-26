@@ -1,131 +1,38 @@
-services:
-  migrate:
-    build:
-      context: .
-    image: kccf-ministry-app:local
-    command: ["bun", "run", "db:migrate"]
-    environment: &app-environment
-      NODE_ENV: development
-      LOG_LEVEL: debug
-      PORT: 3000
-      POSTGRES_HOST: kccf_ministry
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: kccf_admin
-      POSTGRES_PASSWORD: kccfadmin@123.
-      POSTGRES_DB: kccf_ministry_db
-      POSTGRES_USE_SSL: "false"
-      ORISUN_HOST: orisun
-      ORISUN_PORT: 5005
-      ORISUN_USERNAME: ${ORISUN_USERNAME:-admin}
-      ORISUN_PASSWORD: ${ORISUN_PASSWORD:-changeit}
-      ORISUN_BOUNDARY: ${ORISUN_BOUNDARY:-orisun_test_1}
-      NATS_URL: nats://orisun:4224
-      SESSION_SECRET: ${SESSION_SECRET:-local-development-session-secret-please-change}
-    depends_on:
-      kccf_ministry:
-        condition: service_healthy
-    volumes:
-      - .:/app
-      - app_node_modules:/app/node_modules
-    networks:
-      - orisun_net
+name: kccf-ministry-dev
 
+services:
   app:
     build:
       context: .
+      target: development
     image: kccf-ministry-app:local
-    command: ["bun", "run", "dev"]
-    environment: *app-environment
-    depends_on:
-      kccf_ministry:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-      orisun:
-        condition: service_started
+    command: ["bun", "run", "scripts/dev.ts"]
+    init: true
+    environment:
+      NODE_ENV: development
+      PORT: 3000
     ports:
       - "3000:3000"
     volumes:
-      - .:/app
-      - app_node_modules:/app/node_modules
+      - ./src:/app/src
+      - ./static:/app/static
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+      - ./package.json:/app/package.json:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+      - ./bun.lock:/app/bun.lock:ro
+      - ./Dockerfile:/app/Dockerfile:ro
+      - ./docker-compose.yml:/app/docker-compose.yml:ro
+      - ./docker-compose.prod.yml:/app/docker-compose.prod.yml:ro
+      - node_modules:/app/node_modules
     healthcheck:
-      test: ["CMD", "bun", "-e", "const response = await fetch('http://127.0.0.1:3000/'); process.exit(response.ok ? 0 : 1)"]
+      test: ["CMD", "bun", "-e", "const response = await fetch('http://127.0.0.1:3000/health'); process.exit(response.ok ? 0 : 1)"]
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 15s
+    stop_grace_period: 10s
     restart: unless-stopped
-    networks:
-      - orisun_net
-
-  postgres:
-    image: postgres:17.5-alpine
-    container_name: orisun_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: orisun
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
-    networks:
-      - orisun_net
-
-  orisun:
-    image: orexza/orisun:latest
-    container_name: orisun_app
-    restart: unless-stopped
-    environment:
-      ORISUN_PG_HOST: postgres
-      ORISUN_PG_PORT: 5432
-      ORISUN_PG_USER: postgres
-      ORISUN_PG_PASSWORD: postgres
-      ORISUN_PG_NAME: orisun
-      ORISUN_PG_SCHEMAS: "orisun_test_1:public,orisun_admin:admin"
-      ORISUN_BOUNDARIES: '[{"name":"orisun_test_1","description":"test boundary"},{"name":"orisun_admin","description":"admin boundary"}]'
-      ORISUN_ADMIN_BOUNDARY: orisun_admin
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/orisun
-      ORISUN_NATS_HOST: orisun
-      ORISUN_NATS_PORT: 4224
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "5005:5005"
-      - "4224:4224"
-    networks:
-      - orisun_net
-
-  kccf_ministry:
-    image: postgres:17.5-alpine
-    container_name: kccf_ministry
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: kccf_ministry_db
-      POSTGRES_USER: kccf_admin
-      POSTGRES_PASSWORD: kccfadmin@123.
-    volumes:
-      - pg_kccf_ministry_data:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kccf_admin -d kccf_ministry_db"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
-    networks:
-      - orisun_net
 
 volumes:
-  app_node_modules:
-  postgres_data:
-  pg_kccf_ministry_data:
-
-networks:
-  orisun_net:
-    driver: bridge
+  node_modules:

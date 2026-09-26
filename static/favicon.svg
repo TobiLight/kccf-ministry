@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="KCCF">
+  <circle cx="32" cy="32" r="30" fill="#f8f4ec" stroke="#c99a2e" stroke-width="4" />
+  <path
+    d="M20 14h7v15.5L40 14h8.5L33.5 30.5 49 50h-8.5L27 34.5V50h-7z"
+    fill="#33291f"
+  />
+</svg>

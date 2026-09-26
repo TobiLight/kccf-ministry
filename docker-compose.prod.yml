@@ -1,13 +1,22 @@
-services:
-  migrate:
-    environment:
-      NODE_ENV: production
-      LOG_LEVEL: info
-    volumes: !reset []
+name: kccf-ministry-prod
 
+services:
   app:
-    command: ["bun", "run", "start"]
+    build:
+      context: .
+      target: production
+    command: ["bun", "dist/index.js"]
+    init: true
     environment:
       NODE_ENV: production
-      LOG_LEVEL: info
-    volumes: !reset []
+      PORT: 3000
+    ports:
+      - "3001:3000"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const response = await fetch('http://127.0.0.1:3000/health'); process.exit(response.ok ? 0 : 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    stop_grace_period: 10s
+    restart: unless-stopped
