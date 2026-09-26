@@ -21,20 +21,29 @@ export function SermonPlayer({ sermon, className = "" }: SermonPlayerProps) {
     />
   ) : null;
 
+  // The control is omitted rather than rendered with an empty id: a click that
+  // assigned a blank signal would hide the facade and request a dead embed URL
+  // with no way back. Task 6 can still set $sermon.videoId from an archive row.
+  const control = sermon.youtubeId ? (
+    <button
+      type="button"
+      class="sermon-facade-play"
+      data-on:click={`$sermon.videoId = '${sermon.youtubeId}'`}
+      aria-label={`Play message: ${sermon.title}`}
+    >
+      <Icon name="play" size={24} />
+      <span class="sermon-facade-label">Play message</span>
+    </button>
+  ) : (
+    <p class="sermon-facade-note">Video for this message is coming soon.</p>
+  );
+
   return (
     <div class={`sermon-player ${className}`.trim()} id="sermon-player" tabindex={-1} data-signals='{"sermon":{"videoId":""}}'>
       <div class="sermon-player-frame">
         <div class="sermon-facade" data-show="$sermon.videoId === ''">
           {poster}
-          <button
-            type="button"
-            class="sermon-facade-play"
-            data-on:click={`$sermon.videoId = '${sermon.youtubeId}'`}
-            aria-label={`Play ${sermon.title}`}
-          >
-            <Icon name="play" size={24} />
-            <span class="sermon-facade-label">Play message</span>
-          </button>
+          {control}
         </div>
         <iframe
           class="sermon-player-embed"

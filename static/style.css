@@ -1400,6 +1400,20 @@ section {
   outline: 0.2rem solid var(--color-primary-foreground);
   outline-offset: 0.2rem;
 }
+.sermon-facade-note {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  max-width: 24rem;
+  padding: 1rem 1.5rem;
+  border-radius: 1.25rem;
+  background: var(--color-warm-black);
+  color: var(--color-primary-foreground);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: center;
+}
 .sermon-player-meta {
   margin-top: 1.2rem;
 }

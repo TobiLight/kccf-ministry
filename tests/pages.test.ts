@@ -122,24 +122,63 @@ describe("sermons page", () => {
     const { html } = await getPage("/sermons");
 
     expect(html).toContain('id="sermon-player"');
-    expect(html).toContain('data-signals=\'{"sermon":{"videoId":""}}\'');
+    expect(html).toContain('class="sermon-player"');
+    expect(html).toMatch(/id="sermon-player"[^>]*tabindex="-1"/);
+    expect(html).toContain('data-signals="{&quot;sermon&quot;:{&quot;videoId&quot;:&quot;&quot;}}"');
+    expect(html).toContain('class="sermon-player-frame"');
+    expect(html).toContain('class="sermon-facade" data-show="$sermon.videoId === &#39;&#39;"');
     expect(html).toContain("youtube-nocookie.com/embed/");
+    expect(html).not.toContain("youtube.com/embed/");
     expect(html).not.toContain("connect.facebook.net");
-    expect(html).not.toContain("<script src=");
   });
 
-  test("gives the facade play control a real accessible name", async () => {
+  test("ships no non-module script, whatever the attribute order", async () => {
     const { html } = await getPage("/sermons");
-    const label = html.match(/class="sermon-facade-play"[^>]*aria-label="([^"]+)"/)?.[1];
+    const scriptTags = [...html.matchAll(/<script\b[^>]*>/g)].map((match) => match[0]);
 
-    expect(label).toBeDefined();
-    expect(label?.startsWith("Play ")).toBe(true);
+    expect(scriptTags.length).toBeGreaterThan(0);
+    expect(scriptTags.filter((tag) => !/type="module"/.test(tag))).toEqual([]);
+  });
+
+  test("gives the facade play control a real accessible name that contains its visible label", async () => {
+    const { html } = await getPage("/sermons");
+    const control = html.match(/<button[^>]*class="sermon-facade-play"[^>]*>[\s\S]*?<\/button>/)?.[0];
+
+    expect(control).toBeDefined();
+    const label = control?.match(/aria-label="([^"]+)"/)?.[1];
+    expect(label?.startsWith("Play message")).toBe(true);
+    expect(label).toContain("Play message");
+    expect(control).toContain('type="button"');
+    expect(control).toContain('<span class="sermon-facade-label">Play message</span>');
+  });
+
+  test("assigns a real video id to the facade click instead of an absent one", async () => {
+    const { html } = await getPage("/sermons");
+    const click = html.match(/class="sermon-facade-play"[^>]*data-on:click="([^"]+)"/)?.[1];
+
+    expect(click).toBeDefined();
+    expect(click).toMatch(/^\$sermon\.videoId = &#39;[^&#]+&#39;$/);
+    expect(html).not.toMatch(/data-on:click="[^"]*undefined/);
+  });
+
+  test("keeps the embed iframe titled, lazy, and sandboxed to a no-cookie host", async () => {
+    const { html } = await getPage("/sermons");
+    const iframe = html.match(/<iframe[^>]*class="sermon-player-embed"[^>]*>/)?.[0];
+
+    expect(iframe).toBeDefined();
+    expect(iframe).toContain('data-show="$sermon.videoId !== &#39;&#39;"');
+    expect(iframe).toMatch(/data-attr:src="\$sermon\.videoId \? &#39;https:\/\/www\.youtube-nocookie\.com\/embed\/&#39;/);
+    expect(iframe).toMatch(/title="[^"]+"/);
+    expect(iframe).toContain('loading="lazy"');
+    expect(iframe).toContain('allow="autoplay; encrypted-media; picture-in-picture; fullscreen"');
+    expect(iframe).toContain("allowfullscreen");
   });
 
   test("keeps a no-javascript watch link beside the player", async () => {
     const { html } = await getPage("/sermons");
 
     expect(html).toContain("https://www.youtube.com/watch?v=");
+    expect(html).toContain(">Watch on YouTube</span>");
   });
 });
 
