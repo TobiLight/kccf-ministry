@@ -63,7 +63,7 @@ export function parseFeed(xml: string): RawFeedEntry[] {
     throw new FeedError("feed contains no entries");
   }
 
-  return blocks
+  const entries = blocks
     .map((block) => ({
       youtubeId: tagText(block, "yt:videoId"),
       title: tagText(block, "title"),
@@ -71,6 +71,14 @@ export function parseFeed(xml: string): RawFeedEntry[] {
       description: tagText(block, "media:description"),
     }))
     .filter((entry) => entry.youtubeId.length > 0);
+
+  if (entries.length === 0) {
+    throw new FeedError(
+      `feed has ${blocks.length} <entry> block(s) but no usable video id in any of them, so the feed shape or namespace changed`,
+    );
+  }
+
+  return entries;
 }
 
 function looksLikeSpeaker(line: string): boolean {

@@ -164,6 +164,37 @@ describe("sermon feed derivation", () => {
     expect(() => parseFeed('<feed xmlns="http://www.w3.org/2005/Atom"></feed>')).toThrow(FeedError);
   });
 
+  test("rejects a feed whose entries carry no usable video id so a namespace change cannot silently return nothing", () => {
+    const entriesWithoutVideoId = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<feed xmlns="http://www.w3.org/2005/Atom">',
+      "  <title>KCCF Ministries</title>",
+      "  <entry>",
+      "    <id>yt:video:unknown0000</id>",
+      "    <title>KCCF Ministries Live Stream</title>",
+      "    <published>2026-09-20T13:02:55+00:00</published>",
+      "  </entry>",
+      "</feed>",
+    ].join("\n");
+
+    expect(() => parseFeed(entriesWithoutVideoId)).toThrow(FeedError);
+  });
+
+  test("distinguishes the two refusals by message so a broken ingest is diagnosable", () => {
+    const entriesWithoutVideoId = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<feed xmlns="http://www.w3.org/2005/Atom">',
+      "  <entry>",
+      "    <id>yt:video:unknown0000</id>",
+      "    <title>KCCF Ministries Live Stream</title>",
+      "  </entry>",
+      "</feed>",
+    ].join("\n");
+
+    expect(() => parseFeed(entriesWithoutVideoId)).toThrow(/no usable video id/i);
+    expect(() => parseFeed('<feed xmlns="http://www.w3.org/2005/Atom"></feed>')).toThrow(/no entries/i);
+  });
+
   test("takes the title from the first description line, not the useless feed title", () => {
     const derived = deriveEntries(parseFeed(feedXml));
 
@@ -273,6 +304,32 @@ describe("snapshot union", () => {
     const next = buildSnapshot(null, parseFeed(feedXml), "UCRNGCZhVNV2Pj80fs20GNog", "2026-09-26T00:00:00.000Z");
 
     expect(next.entries).toHaveLength(7);
+  });
+
+  test("keeps an entry the feed has rolled off, because the feed only exposes a finite window", () => {
+    const rolledOff = {
+      generatedAt: "2026-08-01T00:00:00.000Z",
+      channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+      entries: [
+        {
+          youtubeId: "oldRolledOff1",
+          title: "A sermon the feed no longer lists",
+          speaker: "Bishop Olayinka Adeyinka",
+          publishedAt: "2026-06-07",
+          partIndex: 1,
+          partCount: 1,
+          needsCuration: false,
+        },
+      ],
+    } satisfies SermonSnapshotLike;
+    const raw = parseFeed(feedXml);
+
+    expect(raw.some((entry) => entry.youtubeId === "oldRolledOff1")).toBe(false);
+
+    const next = buildSnapshot(rolledOff, raw, "UCRNGCZhVNV2Pj80fs20GNog", "2026-09-26T00:00:00.000Z");
+
+    expect(next.entries).toHaveLength(8);
+    expect(next.entries.find((entry) => entry.youtubeId === "oldRolledOff1")).toEqual(rolledOff.entries[0]);
   });
 });
 
