@@ -82,8 +82,9 @@ Tasks 1–4 are the image phase. Tasks 5–9 are the events phase. The image pha
 `bun test tests/assets.test.ts` currently fails five assertions because a prior rename of `prayer-fellowship-*` to `prayer-*` was started and never propagated to any source file. This task restores the three good rungs and deletes the four strays. It deliberately does **not** make the suite green — the two missing originals are regenerated in Task 4, and the plan says so at that task.
 
 **Files:**
-- Delete: `static/images/prayer-640.jpg`, `static/images/prayer-1024.jpg`, `static/images/prayer-1600.jpg`, `static/images/prayer-fellowship-1024jpg`
-- Restore: `static/images/prayer-fellowship-640.jpg`, `static/images/prayer-fellowship-1024.jpg`, `static/images/prayer-fellowship-1600.jpg`
+- Rename into place: `static/images/prayer-1024.jpg` → `static/images/prayer-fellowship-1024.jpg`, `static/images/prayer-1600.jpg` → `static/images/prayer-fellowship-1600.jpg`
+- Regenerate: `static/images/prayer-fellowship-640.jpg` (currently 2048px wide, must be 640)
+- Delete: `static/images/prayer-640.jpg`, `static/images/prayer-fellowship-1024jpg`
 
 **Interfaces:**
 - Consumes: nothing.
@@ -92,7 +93,7 @@ Tasks 1–4 are the image phase. Tasks 5–9 are the events phase. The image pha
 - [ ] **Step 1: Confirm the current broken state**
 
 Run: `ls -1 static/images/ | rg 'prayer'`
-Expected: exactly this list, which shows the stray malformed name and the absence of the real original:
+Expected: exactly this list. The `prayer-*.jpg` names are the abandoned rename, the missing-dot name is the corrupt stray, and `prayer-fellowship.jpg` is absent:
 
 ```
 prayer-1024.jpg
@@ -101,6 +102,8 @@ prayer-640.jpg
 prayer-fellowship-1024jpg
 prayer-fellowship-640.jpg
 ```
+
+All of these are **tracked**. `git checkout` cannot recover the 1024 and 1600 rungs, because history recorded them as renames into `prayer-1024.jpg` / `prayer-1600.jpg`; they must be renamed back with `git mv`.
 
 - [ ] **Step 2: Record the failing baseline**
 
@@ -124,20 +127,26 @@ Expected: an `is invalid` warning and `0,0`. This proves the file is unrecoverab
 
 - [ ] **Step 4: Confirm the untracked files are duplicates, not originals**
 
-Run: `git cat-file -s $(git rev-parse HEAD:static/images/prayer-fellowship-640.jpg) && stat -c%s static/images/prayer-640.jpg`
-Expected: both print `98556`. Identical sizes prove `prayer-640.jpg` is the renamed rung and is safe to delete in favour of the restored name.
+Run: `stat -c%s static/images/prayer-640.jpg static/images/prayer-fellowship-640.jpg`
+Expected: `98556` then `289789`. This proves `prayer-640.jpg` is the genuine 640px rung and that the file still carrying the `prayer-fellowship-` prefix is the wrong 2048px-wide image. Neither may simply be renamed onto the other without regenerating from a real photograph, which is Task 4's job.
 
-- [ ] **Step 5: Restore the three rungs from HEAD**
-
-```bash
-git checkout -- static/images/prayer-fellowship-640.jpg static/images/prayer-fellowship-1024.jpg static/images/prayer-fellowship-1600.jpg
-```
-
-- [ ] **Step 6: Delete the four strays**
+- [ ] **Step 5: Rename the 1024 and 1600 rungs back to the `prayer-fellowship-` prefix**
 
 ```bash
-rm static/images/prayer-640.jpg static/images/prayer-1024.jpg static/images/prayer-1600.jpg static/images/prayer-fellowship-1024jpg
+git mv static/images/prayer-1024.jpg static/images/prayer-fellowship-1024.jpg
+git mv static/images/prayer-1600.jpg static/images/prayer-fellowship-1600.jpg
 ```
+
+- [ ] **Step 6: Delete the two remaining strays**
+
+```bash
+git rm static/images/prayer-640.jpg static/images/prayer-fellowship-1024jpg
+```
+
+`prayer-fellowship-640.jpg` is deliberately **not** deleted or renamed here. `site.ts:57`
+lists it as the 640w rung, so deleting it would break a fourth fetch before Task 4
+regenerates the ladder. It stays in place, still wrong, until Task 4 replaces it — which is
+why Step 7 expects a variant-width failure to survive this task.
 
 - [ ] **Step 7: Verify the restored rungs have their declared widths**
 
@@ -160,11 +169,13 @@ Expected: `clean`. The abandoned rename never reached any source file, so no sou
 - [ ] **Step 9: Commit**
 
 ```bash
-git add static/images/prayer-fellowship-640.jpg static/images/prayer-fellowship-1024.jpg static/images/prayer-fellowship-1600.jpg
+git add -A static/images
 git commit -m "fix: restore misnamed prayer fellowship image variants"
 ```
 
-The deletions of the four strays are untracked-file removals, so they need no staging.
+`git mv` and `git rm` already staged the renames and deletions, so this commit records
+five paths: two renames, two deletions, and nothing for `prayer-fellowship-640.jpg`,
+which is untouched. Verify with `git show --stat HEAD` before moving on.
 
 ---
 
@@ -1462,7 +1473,7 @@ Expected on `/events`: all five strings present. Expected on `/`: `Upcoming Even
 
 ## Notes for the executor
 
-- **The working tree starts dirty.** It carries uncommitted image deletions and additions from an abandoned rename. Task 1 resolves the `prayer-fellowship` part; `bible-study.jpg`, `src/input.css`, `src/components/site-*.tsx`, and `static/style.css` also show as modified. Inspect `git diff` for any file a task touches before staging it, and stage only the paths each task names. Never `git add -A`.
+- **The working tree is clean and the maintainer's in-progress work is already committed** as of `ae1aef0`. It contains their `.header-offset` padding tweak, the `SectionHeading` eyebrow colour, `site.images.logo`, a real `bible-study.jpg` at 2048x1365, and the broken `prayer-fellowship` image state. Build on top of it; do not revert it. Stage only the paths each task names.
 - **Two tasks are deliberately red between steps.** Task 1 ends with three `assets.test.ts` failures, closed by Task 4. Task 5 ends with `type-check` failing on two sites, closed by Task 6. Neither is a mistake; do not "fix" them early, because Task 4 regenerates the files from the chosen photograph and Task 6 rewrites the array.
 - **Task 3 blocks on a human.** Stop and ask. Choosing photographs of a real congregation is the maintainer's decision, not the executor's.
 - **No placeholder text anywhere.** Task 3 commits the maintainer's real choices to `docs/photo-choices.md`, and Task 4 reads its source paths and alt strings from that file. If any value is still missing at Task 4 Step 2, stop and resolve it with the maintainer — never invent a filename, an alt string, or a measurement.
