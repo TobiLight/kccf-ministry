@@ -102,6 +102,19 @@ describe("production compose", () => {
   });
 });
 
+describe("image variant script", () => {
+  test("is committed and exposes a runnable image:variants script", async () => {
+    const source = await readProjectFile("scripts/image-variants.ts");
+    const manifest = JSON.parse(await readProjectFile("package.json")) as {
+      scripts: Record<string, string>;
+    };
+
+    expect(manifest.scripts["image:variants"]).toBe("bun run scripts/image-variants.ts");
+    expect(source).toContain("ffmpeg");
+    expect(source).toContain("ffprobe");
+  });
+});
+
 describe("site identity assets", () => {
   test("serves the favicon as an SVG", async () => {
     const response = await createApp().request("/static/favicon.svg");
