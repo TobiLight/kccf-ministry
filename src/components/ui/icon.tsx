@@ -9,7 +9,9 @@ export type IconName =
   | "mail"
   | "map-pin"
   | "menu"
-  | "phone";
+  | "phone"
+  | "play"
+  | "youtube";
 
 type IconProps = {
   name: IconName;
@@ -69,6 +71,13 @@ export function Icon({ name, className, size = 20 }: IconProps) {
     phone: (
       <>
         <path d="M5 4.5 8.2 3l2.1 4.5-2 1.7a14 14 0 0 0 6.5 6.5l1.7-2 4.5 2.1-1.5 3.2a2 2 0 0 1-2.2 1.1C9.8 18.4 5.6 14.2 3.9 6.7A2 2 0 0 1 5 4.5Z" />
+      </>
+    ),
+    play: <path d="M8 5.5v13l11-6.5-11-6.5Z" fill="currentColor" stroke="none" />,
+    youtube: (
+      <>
+        <rect x="2.5" y="5.5" width="19" height="13" rx="3.5" />
+        <path d="m10.5 9.5 5 2.5-5 2.5v-5Z" fill="currentColor" stroke="none" />
       </>
     ),
   };

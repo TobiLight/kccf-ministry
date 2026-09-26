@@ -117,6 +117,30 @@ describe("sermons page", () => {
     expect(html).not.toContain("Sermon archive");
     expect(html).not.toContain("sermon-date-note");
   });
+
+  test("renders a no-cookie YouTube facade that loads nothing until play is pressed", async () => {
+    const { html } = await getPage("/sermons");
+
+    expect(html).toContain('id="sermon-player"');
+    expect(html).toContain('data-signals=\'{"sermon":{"videoId":""}}\'');
+    expect(html).toContain("youtube-nocookie.com/embed/");
+    expect(html).not.toContain("connect.facebook.net");
+    expect(html).not.toContain("<script src=");
+  });
+
+  test("gives the facade play control a real accessible name", async () => {
+    const { html } = await getPage("/sermons");
+    const label = html.match(/class="sermon-facade-play"[^>]*aria-label="([^"]+)"/)?.[1];
+
+    expect(label).toBeDefined();
+    expect(label?.startsWith("Play ")).toBe(true);
+  });
+
+  test("keeps a no-javascript watch link beside the player", async () => {
+    const { html } = await getPage("/sermons");
+
+    expect(html).toContain("https://www.youtube.com/watch?v=");
+  });
 });
 
 describe("events page", () => {
