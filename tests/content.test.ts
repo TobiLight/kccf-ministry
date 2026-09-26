@@ -14,6 +14,7 @@ import {
 } from "../src/content/sermon-feed";
 import { sermons } from "../src/content/sermons";
 import { imageAssets, site } from "../src/content/site";
+import { syncSermons } from "../scripts/sync-sermons";
 
 type SermonSnapshotLike = {
   generatedAt: string;
@@ -422,5 +423,173 @@ describe("sermon formatting", () => {
 
   test("builds a canonical watch url", () => {
     expect(watchUrlFor("2zFODEV22G0")).toBe("https://www.youtube.com/watch?v=2zFODEV22G0");
+  });
+});
+
+type Recorded = { writes: string[]; logs: string[] };
+
+function syncHarness(feedResponse: Response | Error, snapshotOnDisk: string | null): {
+  deps: Parameters<typeof syncSermons>[0];
+  recorded: Recorded;
+} {
+  const recorded: Recorded = { writes: [], logs: [] };
+
+  return {
+    recorded,
+    deps: {
+      fetchImpl: (async () => {
+        if (feedResponse instanceof Error) {
+          throw feedResponse;
+        }
+        return feedResponse;
+      }) as unknown as typeof fetch,
+      now: () => new Date("2026-09-26T00:00:00.000Z"),
+      readSnapshot: () => snapshotOnDisk,
+      writeSnapshot: (contents) => {
+        recorded.writes.push(contents);
+      },
+      log: (line) => {
+        recorded.logs.push(line);
+      },
+    },
+  };
+}
+
+const feedResponse = () => new Response(feedXml, { status: 200 });
+
+describe("sermon sync safety", () => {
+  test("writes a snapshot on a good fetch", async () => {
+    const { deps, recorded } = syncHarness(feedResponse(), null);
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(true);
+    expect(recorded.writes).toHaveLength(1);
+    expect(JSON.parse(recorded.writes[0]).entries).toHaveLength(7);
+  });
+
+  test("refuses to write and returns ok:false on a non-200 response", async () => {
+    const { deps, recorded } = syncHarness(new Response("<html>not found</html>", { status: 404 }), null);
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+  });
+
+  test("refuses to write when the feed contains no entries", async () => {
+    const { deps, recorded } = syncHarness(
+      new Response('<feed xmlns="http://www.w3.org/2005/Atom"></feed>', { status: 200 }),
+      null,
+    );
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+  });
+
+  test("refuses to write when the network throws", async () => {
+    const { deps, recorded } = syncHarness(new Error("network down"), null);
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+  });
+
+  test("refuses to write when the feed belongs to a different channel", async () => {
+    const wrongChannel = feedXml.replace(/UCRNGCZhVNV2Pj80fs20GNog/g, "UCsomeOtherChannel00000");
+    const { deps, recorded } = syncHarness(new Response(wrongChannel, { status: 200 }), null);
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+  });
+
+  test("keeps existing entries when unioning, so the snapshot can only grow", async () => {
+    const existing = JSON.stringify({
+      generatedAt: "2026-09-01T00:00:00.000Z",
+      channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+      entries: [
+        {
+          youtubeId: "OLDVIDEO00000",
+          title: "A sermon older than the feed window",
+          speaker: "Bishop Olayinka Adeyinka",
+          publishedAt: "2025-01-05",
+          partIndex: 1,
+          partCount: 1,
+          needsCuration: false,
+        },
+      ],
+    });
+    const { deps, recorded } = syncHarness(feedResponse(), existing);
+
+    await syncSermons(deps);
+    const written = JSON.parse(recorded.writes[0]);
+
+    expect(written.entries).toHaveLength(8);
+    expect(written.entries.some((entry: { youtubeId: string }) => entry.youtubeId === "OLDVIDEO00000")).toBe(true);
+  });
+
+  test("reports counts and names new entries so added 0 is distinguishable from broken", async () => {
+    const { deps, recorded } = syncHarness(feedResponse(), null);
+
+    await syncSermons(deps);
+    const report = recorded.logs.join("\n");
+
+    expect(report).toContain("fetched");
+    expect(report).toContain("newly added");
+    expect(report).toContain("2zFODEV22G0");
+    expect(report).toContain("needs curation");
+  });
+
+  test("warns when a curated snapshot entry is absent from the feed", async () => {
+    const existing = JSON.stringify({
+      generatedAt: "2026-09-01T00:00:00.000Z",
+      channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+      entries: [
+        {
+          youtubeId: "GONEVIDEO00000",
+          title: "Unlisted recording",
+          speaker: null,
+          publishedAt: "2025-01-05",
+          partIndex: 1,
+          partCount: 1,
+          needsCuration: false,
+        },
+      ],
+    });
+    const { deps, recorded } = syncHarness(feedResponse(), existing);
+
+    await syncSermons(deps);
+
+    expect(recorded.logs.join("\n")).toContain("GONEVIDEO00000");
+  });
+});
+
+describe("committed sermon snapshot", () => {
+  test("is non-empty and every entry carries a video id", async () => {
+    const snapshot = JSON.parse(
+      await readFile(new URL("../src/content/sermons.generated.json", import.meta.url), "utf8"),
+    ) as SermonSnapshotLike;
+
+    expect(snapshot.entries.length).toBeGreaterThan(0);
+    expect(snapshot.channelId).toBe("UCRNGCZhVNV2Pj80fs20GNog");
+
+    for (const entry of snapshot.entries) {
+      expect(entry.youtubeId).toMatch(/^[A-Za-z0-9_-]{6,}$/);
+      expect(entry.title.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("has no duplicate video ids", async () => {
+    const snapshot = JSON.parse(
+      await readFile(new URL("../src/content/sermons.generated.json", import.meta.url), "utf8"),
+    ) as SermonSnapshotLike;
+    const ids = snapshot.entries.map((entry) => entry.youtubeId);
+
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

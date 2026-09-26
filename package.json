@@ -11,6 +11,7 @@
     "type-check": "bunx tsc --noEmit",
     "css:build": "bunx @tailwindcss/cli -i src/input.css -o static/style.css",
     "css:watch": "bunx @tailwindcss/cli -i src/input.css -o static/style.css --watch=always",
+    "sermons:sync": "bun run scripts/sync-sermons.ts",
     "check": "bun run type-check && bun run css:build && bun run test && bun run build"
   },
   "dependencies": {
