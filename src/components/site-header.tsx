@@ -53,10 +53,10 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
               width={site.imageAssets.logo.width}
               height={site.imageAssets.logo.height}
             />
-            <span class="brand-copy">
+            {/* <span class="brand-copy">
               <strong>KCCF</strong>
               <span> Ministries</span>
-            </span>
+            </span> */}
             <span class="visually-hidden"> home</span>
           </a>
           <nav class="desktop-navigation" aria-label="Primary navigation">

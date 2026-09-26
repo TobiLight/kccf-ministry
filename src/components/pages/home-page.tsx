@@ -190,7 +190,7 @@ export function HomePage() {
       <section class="final-cta-section">
         <div class="container final-cta">
           <div>
-            <p class="eyebrow">Come as you are</p>
+            <p class="eyebrow !text-primary">Come as you are</p>
             <h2>Experience the Covenant Life</h2>
             <p>Find your place in a church family rooted in faith, purpose, and love.</p>
           </div>

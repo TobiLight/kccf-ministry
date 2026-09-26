@@ -12,7 +12,7 @@ export function SectionHeading({ eyebrow, title, description, align = "left", cl
 
   return (
     <div class={classes}>
-      {eyebrow ? <p class="eyebrow">{eyebrow}</p> : null}
+      {eyebrow ? <p class="eyebrow !text-primary">{eyebrow}</p> : null}
       <h2 id={id}>{title}</h2>
       {description ? <p class="section-heading-description">{description}</p> : null}
     </div>

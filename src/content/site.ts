@@ -139,6 +139,7 @@ export const site = {
     bibleStudy: imageAssets.bibleStudy.src,
     pastorOne: imageAssets.pastorOne.src,
     pastorTwo: imageAssets.pastorTwo.src,
+    logo: imageAssets.logo.src
   },
   imageAssets,
 };
