@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"
+      xmlns:media="http://search.yahoo.com/mrss/"
+      xmlns="http://www.w3.org/2005/Atom">
+  <link rel="self" href="http://www.youtube.com/feeds/videos.xml?channel_id=UCRNGCZhVNV2Pj80fs20GNog"/>
+  <id>yt:channel:UCRNGCZhVNV2Pj80fs20GNog</id>
+  <yt:channelId>UCRNGCZhVNV2Pj80fs20GNog</yt:channelId>
+  <title>KCCF Ministries</title>
+  <entry>
+    <id>yt:video:2zFODEV22G0</id>
+    <yt:videoId>2zFODEV22G0</yt:videoId>
+    <yt:channelId>UCRNGCZhVNV2Pj80fs20GNog</yt:channelId>
+    <title>KCCF Ministries Live Stream</title>
+    <published>2026-09-20T13:02:55+00:00</published>
+    <media:description>18th Annual Anniversary
+Theme: Harvest Of Abundance</media:description>
+  </entry>
+  <entry>
+    <id>yt:video:P2GUPgTsIuA</id>
+    <yt:videoId>P2GUPgTsIuA</yt:videoId>
+    <yt:channelId>UCRNGCZhVNV2Pj80fs20GNog</yt:channelId>
+    <title>KCCF Ministries Live Stream</title>
+    <published>2026-09-20T12:52:38+00:00</published>
+    <media:description>18th Annual Anniversary
+Theme: Harvest Of Abundance</media:description>
+  </entry>
+  <entry>
+    <id>yt:video:eboHWsOsGHY</id>
+    <yt:videoId>eboHWsOsGHY</yt:videoId>
+    <yt:channelId>UCRNGCZhVNV2Pj80fs20GNog</yt:channelId>
+    <title>KCCF Ministries Live Stream</title>
+    <published>2026-09-19T10:49:31+00:00</published>
+    <media:description>Praise Night
+I Shall Never Lack Again</media:description>
+  </entry>
+  <entry>
+    <id>yt:video:GUup6e4Ccp0</id>
+    <yt:videoId>GUup6e4Ccp0</yt:videoId>
+    <yt:channelId>UCRNGCZhVNV2Pj80fs20GNog</yt:channelId>
+    <title>KCCF Ministries Live Stream</title>
+    <published>2026-09-17T09:00:00+00:00</published>
+    <media:description>Wisdom To Receive And Retain Increase
+Bishop Olayinka Adeyinka | Pastor</media:description>
+  </entry>
+  <entry>
+    <id>yt:video:zWoO2YLWi_Q</id>
+    <yt:videoId>zWoO2YLWi_Q</yt:videoId>
+    <yt:channelId>UCRNGCZhVNV2Pj80fs20GNog</yt:channelId>
+    <title>KCCF Ministries Live Stream</title>
+    <published>2026-09-16T08:00:00+00:00</published>
+    <media:description>The Potter&#39;s Hands/ Broken Vessels Shall Hold Water Again.
+Bishop Olayinka Adeyinka</media:description>
+  </entry>
+  <entry>
+    <id>yt:video:3Cd8mf-Vvmk</id>
+    <yt:videoId>3Cd8mf-Vvmk</yt:videoId>
+    <yt:channelId>UCRNGCZhVNV2Pj80fs20GNog</yt:channelId>
+    <title>KCCF Ministries Live Stream</title>
+    <published>2026-09-17T08:00:00+00:00</published>
+    <media:description>The Potter&#39;s Hands/ Broken Vessels Shall Hold Water Again.
+Bishop Olayinka Adeyinka</media:description>
+  </entry>
+  <entry>
+    <id>yt:video:45e5ZCa-7Sg</id>
+    <yt:videoId>45e5ZCa-7Sg</yt:videoId>
+    <yt:channelId>UCRNGCZhVNV2Pj80fs20GNog</yt:channelId>
+    <title>The Breathe Of Life By Pastor Abimbola</title>
+    <published>2026-09-16T07:00:00+00:00</published>
+    <media:description></media:description>
+  </entry>
+</feed>

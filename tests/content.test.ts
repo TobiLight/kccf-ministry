@@ -1,9 +1,35 @@
 import { describe, expect, test } from "bun:test";
+import { readFile } from "node:fs/promises";
 import { events, monthlyService } from "../src/content/events";
 import { leadership } from "../src/content/leadership";
 import { ministries } from "../src/content/ministries";
+import {
+  FeedError,
+  buildSnapshot,
+  deriveEntries,
+  formatSermonDate,
+  parseFeed,
+  resolveSermons,
+  watchUrlFor,
+} from "../src/content/sermon-feed";
 import { sermons } from "../src/content/sermons";
 import { imageAssets, site } from "../src/content/site";
+
+type SermonSnapshotLike = {
+  generatedAt: string;
+  channelId: string;
+  entries: {
+    youtubeId: string;
+    title: string;
+    speaker: string | null;
+    publishedAt: string;
+    partIndex: number;
+    partCount: number;
+    needsCuration: boolean;
+  }[];
+};
+
+const feedXml = await readFile(new URL("./fixtures/sermons-feed.xml", import.meta.url), "utf8");
 
 const internalRoutes = ["/", "/about", "/ministries", "/sermons", "/events", "/leadership", "/contact"];
 
@@ -107,5 +133,237 @@ describe("site content", () => {
     for (const sermon of sermons) {
       expect(Boolean(sermon.youtubeId) && Boolean(sermon.facebookUrl)).toBe(false);
     }
+  });
+});
+
+describe("sermon feed derivation", () => {
+  test("parses every entry out of an Atom feed", () => {
+    const raw = parseFeed(feedXml);
+
+    expect(raw).toHaveLength(7);
+    expect(raw[0]).toEqual({
+      youtubeId: "2zFODEV22G0",
+      title: "KCCF Ministries Live Stream",
+      published: "2026-09-20T13:02:55+00:00",
+      description: "18th Annual Anniversary\nTheme: Harvest Of Abundance",
+    });
+  });
+
+  test("decodes XML entities in the description", () => {
+    const raw = parseFeed(feedXml);
+    const potters = raw.find((entry) => entry.youtubeId === "zWoO2YLWi_Q");
+
+    expect(potters?.description).toContain("The Potter's Hands");
+  });
+
+  test("rejects a document that is not an atom feed", () => {
+    expect(() => parseFeed("<!DOCTYPE html><html lang=en></html>")).toThrow(FeedError);
+  });
+
+  test("rejects a feed with no entries so a broken fetch can never empty the archive", () => {
+    expect(() => parseFeed('<feed xmlns="http://www.w3.org/2005/Atom"></feed>')).toThrow(FeedError);
+  });
+
+  test("takes the title from the first description line, not the useless feed title", () => {
+    const derived = deriveEntries(parseFeed(feedXml));
+
+    expect(derived.find((entry) => entry.youtubeId === "2zFODEV22G0")?.title).toBe("18th Annual Anniversary");
+  });
+
+  test("falls back to the feed title when the description is empty", () => {
+    const derived = deriveEntries(parseFeed(feedXml));
+
+    expect(derived.find((entry) => entry.youtubeId === "45e5ZCa-7Sg")?.title).toBe(
+      "The Breathe Of Life By Pastor Abimbola",
+    );
+  });
+
+  test("accepts a person-like speaker line", () => {
+    const derived = deriveEntries(parseFeed(feedXml));
+
+    expect(derived.find((entry) => entry.youtubeId === "GUup6e4Ccp0")?.speaker).toBe(
+      "Bishop Olayinka Adeyinka | Pastor",
+    );
+  });
+
+  test("rejects a colon-bearing description line as a speaker", () => {
+    const derived = deriveEntries(parseFeed(feedXml));
+
+    expect(derived.find((entry) => entry.youtubeId === "2zFODEV22G0")?.speaker).toBeNull();
+  });
+
+  test("rejects a multi-word line with no title word as a speaker", () => {
+    const derived = deriveEntries(parseFeed(feedXml));
+
+    expect(derived.find((entry) => entry.youtubeId === "eboHWsOsGHY")?.speaker).toBeNull();
+  });
+
+  test("groups entries that share a description into numbered parts ordered by date", () => {
+    const derived = deriveEntries(parseFeed(feedXml));
+    const parts = derived.filter((entry) => entry.title.startsWith("The Potter's Hands"));
+
+    expect(parts).toHaveLength(2);
+    expect(parts.map((entry) => [entry.partIndex, entry.partCount])).toEqual([
+      [1, 2],
+      [2, 2],
+    ]);
+    expect(parts[0].youtubeId).toBe("zWoO2YLWi_Q");
+    expect(parts[1].youtubeId).toBe("3Cd8mf-Vvmk");
+  });
+
+  test("numbers a shared occasion description as parts too", () => {
+    const derived = deriveEntries(parseFeed(feedXml));
+    const occasion = derived.filter((entry) => entry.title === "18th Annual Anniversary");
+
+    expect(occasion.map((entry) => entry.partCount)).toEqual([2, 2]);
+  });
+
+  test("flags an entry for curation when the title came from the fallback or contains a slash", () => {
+    const derived = deriveEntries(parseFeed(feedXml));
+
+    expect(derived.find((entry) => entry.youtubeId === "45e5ZCa-7Sg")?.needsCuration).toBe(true);
+    expect(derived.find((entry) => entry.youtubeId === "zWoO2YLWi_Q")?.needsCuration).toBe(true);
+  });
+
+  test("never rewrites the stray slash inside a title", () => {
+    const derived = deriveEntries(parseFeed(feedXml));
+
+    expect(derived.find((entry) => entry.youtubeId === "zWoO2YLWi_Q")?.title).toBe(
+      "The Potter's Hands/ Broken Vessels Shall Hold Water Again.",
+    );
+  });
+});
+
+describe("snapshot union", () => {
+  const existing: SermonSnapshotLike = {
+    generatedAt: "2026-09-01T00:00:00.000Z",
+    channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+    entries: [
+      {
+        youtubeId: "GUup6e4Ccp0",
+        title: "Hand-curated title that must survive",
+        speaker: "Bishop Olayinka Adeyinka",
+        publishedAt: "2026-09-17",
+        partIndex: 1,
+        partCount: 1,
+        needsCuration: false,
+      },
+    ],
+  };
+
+  test("keeps every existing entry and adds only unseen video ids", () => {
+    const next = buildSnapshot(existing, parseFeed(feedXml), "UCRNGCZhVNV2Pj80fs20GNog", "2026-09-26T00:00:00.000Z");
+
+    expect(next.entries).toHaveLength(7);
+    expect(next.entries.find((entry) => entry.youtubeId === "GUup6e4Ccp0")?.title).toBe(
+      "Hand-curated title that must survive",
+    );
+    expect(next.generatedAt).toBe("2026-09-26T00:00:00.000Z");
+  });
+
+  test("is idempotent, so re-running changes only generatedAt", () => {
+    const first = buildSnapshot(existing, parseFeed(feedXml), "UCRNGCZhVNV2Pj80fs20GNog", "2026-09-26T00:00:00.000Z");
+    const second = buildSnapshot(first, parseFeed(feedXml), "UCRNGCZhVNV2Pj80fs20GNog", "2026-09-27T00:00:00.000Z");
+
+    expect(second.entries).toEqual(first.entries);
+    expect(second.generatedAt).not.toBe(first.generatedAt);
+  });
+
+  test("builds from nothing when no snapshot exists yet", () => {
+    const next = buildSnapshot(null, parseFeed(feedXml), "UCRNGCZhVNV2Pj80fs20GNog", "2026-09-26T00:00:00.000Z");
+
+    expect(next.entries).toHaveLength(7);
+  });
+});
+
+describe("resolveSermons", () => {
+  const snapshot: SermonSnapshotLike = {
+    generatedAt: "2026-09-26T00:00:00.000Z",
+    channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+    entries: deriveEntries(parseFeed(feedXml)),
+  };
+
+  test("lets a curated entry win over feed data for the same video id", () => {
+    const merged = resolveSermons(
+      [
+        {
+          title: "Curated Wisdom",
+          date: "2026-09-17",
+          speaker: "Bishop Olayinka Adeyinka",
+          summary: "Hand written.",
+          youtubeId: "GUup6e4Ccp0",
+        },
+      ],
+      snapshot,
+    );
+
+    const curated = merged.find((sermon) => sermon.youtubeId === "GUup6e4Ccp0");
+
+    expect(curated?.title).toBe("Curated Wisdom");
+    expect(curated?.summary).toBe("Hand written.");
+    expect(merged.filter((sermon) => sermon.youtubeId === "GUup6e4Ccp0")).toHaveLength(1);
+  });
+
+  test("appends feed entries nobody has curated", () => {
+    const merged = resolveSermons(
+      [{ title: "Curated Wisdom", date: "2026-09-17", youtubeId: "GUup6e4Ccp0" }],
+      snapshot,
+    );
+
+    expect(merged).toHaveLength(7);
+  });
+
+  test("suffixes a multi-part title and threads partIndex as a sort key", () => {
+    const merged = resolveSermons([], snapshot);
+    const first = merged.find((sermon) => sermon.youtubeId === "zWoO2YLWi_Q");
+
+    expect(first?.title).toBe("The Potter's Hands/ Broken Vessels Shall Hold Water Again. — Part 1 of 2");
+    expect(first?.partIndex).toBe(1);
+  });
+
+  test("sorts by date descending so the first entry is the newest message", () => {
+    const merged = resolveSermons([], snapshot);
+
+    expect(merged[0].date).toBe("2026-09-20");
+    expect(merged.at(-1)?.date).toBe("2026-09-16");
+  });
+
+  test("orders parts of one sermon ascending within a shared date", () => {
+    const merged = resolveSermons(
+      [
+        { title: "Curated Wisdom", date: "2026-09-17", youtubeId: "GUup6e4Ccp0" },
+        { title: "Later", date: "2026-09-18" },
+        { title: "Same day highlight", date: "2026-09-20" },
+      ],
+      snapshot,
+    );
+    const onTwentieth = merged.filter((sermon) => sermon.date === "2026-09-20");
+
+    expect(onTwentieth.map((sermon) => sermon.partIndex ?? 0)).toEqual([0, 1, 2]);
+  });
+
+  test("returns the curated list untouched when the snapshot is null or empty", () => {
+    const curated = [
+      { title: "Highlight only", date: "2026-08-17", image: "/static/images/bible-study.jpg" },
+    ];
+
+    expect(resolveSermons(curated, null)).toEqual(curated);
+    expect(resolveSermons(curated, { generatedAt: "x", channelId: "y", entries: [] })).toEqual(curated);
+  });
+
+  test("carries needsCuration through from the snapshot", () => {
+    const merged = resolveSermons([], snapshot);
+
+    expect(merged.find((sermon) => sermon.youtubeId === "eboHWsOsGHY")?.needsCuration).toBe(true);
+  });
+});
+
+describe("sermon formatting", () => {
+  test("formats an ISO date for display", () => {
+    expect(formatSermonDate("2026-09-21")).toBe("September 21, 2026");
+  });
+
+  test("builds a canonical watch url", () => {
+    expect(watchUrlFor("2zFODEV22G0")).toBe("https://www.youtube.com/watch?v=2zFODEV22G0");
   });
 });
