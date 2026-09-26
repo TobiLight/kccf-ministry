@@ -508,6 +508,69 @@ describe("sermon sync safety", () => {
     expect(recorded.writes).toHaveLength(0);
   });
 
+  test("refuses to write when the response is not an atom document", async () => {
+    const { deps, recorded } = syncHarness(
+      new Response("<!DOCTYPE html><html lang=en><body>not a feed</body></html>", { status: 200 }),
+      null,
+    );
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+  });
+
+  test("refuses to write when the feed entries carry no usable video id", async () => {
+    const entriesWithoutVideoId = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<feed xmlns="http://www.w3.org/2005/Atom">',
+      `  <title>${site.name}</title>`,
+      "  <entry>",
+      "    <id>yt:video:unknown0000</id>",
+      "    <title>KCCF Ministries Live Stream</title>",
+      "    <published>2026-09-20T13:02:55+00:00</published>",
+      "  </entry>",
+      "</feed>",
+    ].join("\n");
+    const { deps, recorded } = syncHarness(new Response(entriesWithoutVideoId, { status: 200 }), null);
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+  });
+
+  test("refuses to write when the committed snapshot is unparseable, so a corrupt file cannot empty the archive", async () => {
+    const { deps, recorded } = syncHarness(feedResponse(), '{ "entries": [ truncated');
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+  });
+
+  test("refuses to write when the committed snapshot has no entries array", async () => {
+    const notASnapshot = JSON.stringify({
+      generatedAt: "2026-09-01T00:00:00.000Z",
+      channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+    });
+    const { deps, recorded } = syncHarness(feedResponse(), notASnapshot);
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+  });
+
+  test("seeds a fresh snapshot only when no snapshot file exists at all", async () => {
+    const { deps, recorded } = syncHarness(feedResponse(), null);
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(true);
+    expect(recorded.writes).toHaveLength(1);
+  });
+
   test("keeps existing entries when unioning, so the snapshot can only grow", async () => {
     const existing = JSON.stringify({
       generatedAt: "2026-09-01T00:00:00.000Z",

@@ -14,6 +14,11 @@ Run it manually, then commit the changed snapshot:
 - A bad fetch writes nothing and exits non-zero. A wrong playlist id, a private
   playlist, an empty response, a non-200, or a feed for a different channel all
   leave the committed snapshot exactly as it was.
+- An unreadable committed snapshot also writes nothing and exits non-zero. A
+  file that is not valid JSON, or that has no `entries` array, is never treated
+  as "no snapshot yet" and never reseeded from the feed window, because that
+  would silently drop every sermon older than the feed. Fix or delete the file
+  and run again.
 - The feed only exposes roughly the last fifteen uploads, which for this channel
   is about five days. It is a tripwire for "did we miss a service", not an
   archive.
@@ -29,7 +34,9 @@ generated row permanently.
 
 Because the sync only ever adds, removing a sermon means editing **both**
 `src/content/sermons.ts` and `src/content/sermons.generated.json`. Editing only
-the curated file lets the next sync restore it from the snapshot.
+the curated file lets the next sync restore it from the snapshot. Keep the JSON
+valid: if you break it, the next sync refuses to run rather than reseeding from
+the feed and losing the archive.
 
 ## Reading the report
 

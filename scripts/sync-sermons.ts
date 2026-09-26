@@ -18,18 +18,29 @@ export type SyncResult =
   | { ok: true; added: number; total: number; report: string }
   | { ok: false; reason: string };
 
-function parseExisting(raw: string | null): SermonSnapshot | null {
-  if (!raw) {
-    return null;
+type ExistingSnapshot =
+  | { state: "absent" }
+  | { state: "valid"; snapshot: SermonSnapshot }
+  | { state: "corrupt"; reason: string };
+
+function parseExisting(raw: string | null): ExistingSnapshot {
+  if (raw === null) {
+    return { state: "absent" };
   }
+
+  let parsed: unknown;
 
   try {
-    const parsed = JSON.parse(raw) as SermonSnapshot;
-
-    return Array.isArray(parsed.entries) ? parsed : null;
-  } catch {
-    return null;
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return { state: "corrupt", reason: `not valid JSON (${(error as Error).message})` };
   }
+
+  if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as SermonSnapshot).entries)) {
+    return { state: "corrupt", reason: "it has no entries array" };
+  }
+
+  return { state: "valid", snapshot: parsed as SermonSnapshot };
 }
 
 export async function syncSermons(deps: SyncDeps): Promise<SyncResult> {
@@ -67,13 +78,23 @@ export async function syncSermons(deps: SyncDeps): Promise<SyncResult> {
     return { ok: false, reason: `feed does not mention channel ${channelId}` };
   }
 
-  const existing = parseExisting(deps.readSnapshot());
-  const existingIds = new Set((existing?.entries ?? []).map((entry) => entry.youtubeId));
+  const rawExisting = deps.readSnapshot();
+  const existing = parseExisting(rawExisting);
+
+  if (existing.state === "corrupt") {
+    return {
+      ok: false,
+      reason: `the committed snapshot is unreadable because ${existing.reason}, so refusing to overwrite it and risk dropping every sermon older than the feed window; repair or delete src/content/sermons.generated.json`,
+    };
+  }
+
+  const preserved = existing.state === "valid" ? existing.snapshot : null;
+  const existingIds = new Set((preserved?.entries ?? []).map((entry) => entry.youtubeId));
   const incomingIds = new Set(raw.map((entry) => entry.youtubeId));
-  const next = buildSnapshot(existing, raw, channelId, deps.now().toISOString());
+  const next = buildSnapshot(preserved, raw, channelId, deps.now().toISOString());
   const added = next.entries.filter((entry) => !existingIds.has(entry.youtubeId));
   const flagged = next.entries.filter((entry) => entry.needsCuration);
-  const missing = (existing?.entries ?? []).filter((entry) => !incomingIds.has(entry.youtubeId));
+  const missing = (preserved?.entries ?? []).filter((entry) => !incomingIds.has(entry.youtubeId));
 
   deps.writeSnapshot(`${JSON.stringify(next, null, 2)}\n`);
 
