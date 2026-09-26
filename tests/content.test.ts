@@ -87,4 +87,25 @@ describe("site content", () => {
   test("intentionally has no featured events yet", () => {
     expect(events).toEqual([]);
   });
+
+  test("exposes the YouTube channel identity used by the sermon sync", () => {
+    expect(site.youtube).toEqual({
+      channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+      channelUrl: "https://www.youtube.com/@kccfministries1579",
+      playlistId: "",
+    });
+  });
+
+  test("stores every curated sermon date as an ISO 8601 calendar date", () => {
+    for (const sermon of sermons) {
+      expect(sermon.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(Number.isNaN(Date.parse(sermon.date))).toBe(false);
+    }
+  });
+
+  test("never gives a curated sermon both a YouTube id and a Facebook url", () => {
+    for (const sermon of sermons) {
+      expect(Boolean(sermon.youtubeId) && Boolean(sermon.facebookUrl)).toBe(false);
+    }
+  });
 });
