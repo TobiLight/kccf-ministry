@@ -129,6 +129,7 @@ describe("security headers", () => {
     const directives = parsePolicy(policy);
 
     expect(directives["default-src"]).toEqual(["'self'"]);
+    expect(directives["frame-src"]).toEqual(["'self'", "https://www.youtube-nocookie.com"]);
     expect(directives["script-src"]).toEqual(["'self'", "'unsafe-eval'"]);
     expect(directives["script-src-attr"]).toEqual(["'none'"]);
     expect(directives["style-src"]).toEqual(["'self'", "https://fonts.googleapis.com"]);
@@ -153,6 +154,28 @@ describe("security headers", () => {
     expect(directives["script-src-attr"]).not.toContain("'unsafe-eval'");
     expect(directives["default-src"]).not.toContain("'unsafe-eval'");
     expect(directives["style-src"]).not.toContain("'unsafe-eval'");
+    expect(directives["connect-src"]).toEqual(["'self'"]);
+  });
+
+  test("permits the no-cookie YouTube embed in frame-src and nowhere else", async () => {
+    const response = await createApp().request("/sermons");
+    const policy = response.headers.get("content-security-policy") ?? "";
+    const directives = parsePolicy(policy);
+    const host = "https://www.youtube-nocookie.com";
+
+    expect(directives["frame-src"]).toEqual(["'self'", host]);
+
+    for (const [name, values] of Object.entries(directives)) {
+      if (name === "frame-src") {
+        continue;
+      }
+
+      expect(values).not.toContain(host);
+    }
+
+    expect(policy).not.toContain("https://www.youtube.com");
+    expect(policy).not.toContain("https://connect.facebook.net");
+    expect(directives["img-src"]).toEqual(["'self'", "data:"]);
     expect(directives["connect-src"]).toEqual(["'self'"]);
   });
 
