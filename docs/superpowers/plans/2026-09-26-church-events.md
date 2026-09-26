@@ -83,7 +83,7 @@ Tasks 1–4 are the image phase. Tasks 5–9 are the events phase. The image pha
 
 **Files:**
 - Rename into place: `static/images/prayer-1024.jpg` → `static/images/prayer-fellowship-1024.jpg`, `static/images/prayer-1600.jpg` → `static/images/prayer-fellowship-1600.jpg`
-- Regenerate: `static/images/prayer-fellowship-640.jpg` (currently 2048px wide, must be 640)
+- Left in place, still wrong: `static/images/prayer-fellowship-640.jpg` (currently 2048px wide). `site.ts` references it, so it must not be deleted here; Task 4 regenerates it at 640.
 - Delete: `static/images/prayer-640.jpg`, `static/images/prayer-fellowship-1024jpg`
 
 **Interfaces:**
@@ -169,13 +169,17 @@ Expected: `clean`. The abandoned rename never reached any source file, so no sou
 - [ ] **Step 9: Commit**
 
 ```bash
-git add -A static/images
-git commit -m "fix: restore misnamed prayer fellowship image variants"
+git commit -am "fix: restore misnamed prayer fellowship image variants"
 ```
 
+`git mv` and `git rm` already staged everything, so `-a` picks up nothing unintended.
+Do **not** use `git add -A`: a path-scoped `add -A` is a habit that breaks the moment a
+task has a real untracked file it must not stage.
+
 `git mv` and `git rm` already staged the renames and deletions, so this commit records
-five paths: two renames, two deletions, and nothing for `prayer-fellowship-640.jpg`,
-which is untouched. Verify with `git show --stat HEAD` before moving on.
+exactly **four** paths: two renames and two deletions. `prayer-fellowship-640.jpg` is
+untouched and therefore records nothing. Verify with `git show --stat HEAD` before moving
+on — it should list four.
 
 ---
 
