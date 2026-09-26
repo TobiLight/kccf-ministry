@@ -46,9 +46,10 @@ image rename that has broken the hero image of three pages.
 1. Five past and four upcoming events render on `/events` in two clearly labelled sections.
 2. Past events can never appear under an "upcoming" heading, on `/events` or the home page.
 3. The past/upcoming distinction never reclassifies itself as the clock advances.
-4. Event cards render through the shared `Card` component, gaining responsive images and
-   base card styling.
-5. The four stock photographs become real church photography.
+4. Event cards render through the shared `Card` component, so the base card styling and
+   padding that the current hand-rolled markup silently misses actually apply.
+5. The three remaining stock photographs become real church photography. `about` is
+   already correct and is not touched (§4.5).
 6. `bun test` is green, and the 22 MB of oversized originals is gone.
 7. Replacing a photograph in future is a two-minute, repeatable operation.
 
@@ -216,7 +217,9 @@ a manual edit, which is correct: it is an editorial act.
 **Why rename at all.** "Featured" described an empty placeholder array. With past and
 upcoming events both listed, every event is equally featured and the name is misleading.
 Plain `Event` collides with the DOM `Event` global in TypeScript, so `ChurchEvent` is the
-shortest unambiguous name. The rename touches `types.ts`, `events.ts`, and two test imports.
+shortest unambiguous name. The rename touches exactly three sites — the declaration at
+`types.ts:49`, the import at `events.ts:1`, and the annotation at `events.ts:8`. No test
+imports the type by name, so no test edit is caused by the rename itself.
 
 ### 6.2 Selectors (`src/content/events.ts`)
 
@@ -392,41 +395,68 @@ and holds no state.
 
 ## 10. Image work
 
-### 10.1 Repair (gate: `bun test tests/assets.test.ts` green)
+### 10.1 The governing `src` convention
+
+Two tests pin the image contract precisely, and both must survive this work:
+
+- `assets.test.ts:109-114` asserts `imageAssets.hero.src`, `sizes`, and the **exact**
+  `hero` srcset string, ending `/static/images/hero.jpg 2048w`.
+- `assets.test.ts:135-139` is named "keeps the original full-size hero as the local
+  fallback" but actually asserts on `imageAssets.about`: `src` is the 4389×3292
+  original, with the ladder topping out below it at 2400w.
+
+Read together the rule is: **`src` is the largest local file for the asset, and is itself
+the top `srcset` entry.** `hero` follows it exactly (2048 `src`, ladder
+640/1024/1600/2048). `about` follows the same principle with a larger original.
+
+This is why §10.2 does **not** repoint `src` at a `-1600` variant. The correct move is to
+**regenerate the oversized originals at a right-sized maximum width** and keep the naming
+and ladder shape intact. The 6000×4000 sources make this free: a 1600w derivative of a
+10.4 MB original is roughly 350 KB, so the convention survives and the file shrinks by
+97%.
+
+### 10.2 File-hygiene repair
 
 1. `git checkout -- static/images/prayer-fellowship-640.jpg
    static/images/prayer-fellowship-1024.jpg static/images/prayer-fellowship-1600.jpg`
 2. Delete the untracked `prayer-640.jpg`, `prayer-1024.jpg`, `prayer-1600.jpg`, and the
-   corrupt `prayer-fellowship-1024jpg`.
-3. **Drop the 6000w originals.** Repoint `prayerFellowship.src` and `worshipMoment.src` at
-   their 1600w files, set the declared `width`/`height` to 1600×1067, and trim both srcset
-   ladders to end at 1600w. No page renders wider than `38rem`, and `hero` — the only
-   `sizes: 100vw` asset — is handled separately in §10.2. This deletes 10.4 MB and 11.8 MB
-   from the repository and every Docker image build.
-4. Correct `bibleStudy` to `2048×1365` at `site.ts:97`.
-5. `generatedVariants` (`assets.test.ts:17-31`) needs **no change** in this step: all three
-   `prayer-fellowship-*` rungs survive step 3, and dropping the 6000w originals removes no
-   variant row, because the originals were listed in `imageFiles` (`:7-15`) and not in
-   `generatedVariants`. `imageFiles` loses `prayer-fellowship.jpg` and
-   `worship-moment.jpg`.
+   corrupt `prayer-fellowship-1024jpg`. The corrupt stray must be **deleted, not
+   renamed**: `ffprobe` cannot parse it, so it is unrecoverable short of re-deriving it
+   from the correct `-640` rung.
+3. Correct `bibleStudy` to its real `2048×1365` at `site.ts:97`.
 
-The corrupt stray must be deleted rather than renamed: `ffprobe` cannot parse it, so it is
-not recoverable by any means short of re-deriving it from the correct `-640` rung.
+`prayer-fellowship.jpg` and `worship-moment.jpg` are **not** restored from `HEAD`. Their
+contents are replaced outright in §10.3, at a right-sized width, so restoring the 10.4 MB
+and 11.8 MB originals first would be wasted work.
 
-### 10.2 Replace the three stock photographs
+**`assets.test.ts` is expected to stay red between this section and §10.3**, because two
+of the five current failures are missing files that §10.3 regenerates. §10.3 is the gate
+that closes them, and it must not be declared done until `bun test tests/assets.test.ts`
+is green.
 
-| Slot | Used by | Rungs | Constraint |
-|---|---|---|---|
-| `hero` | `/` main hero (`home-page.tsx:20`) | 640/1024/1600/2400 | `sizes: 100vw` — the only full-bleed asset, so it needs a 2400w top rung |
-| `worshipMoment` | `/sermons` hero, `/about` (`:82`) | 640/1024/1600 | — |
-| `prayerFellowship` | `/`, `/events`, `/leadership` heroes | 640/1024/1600 | alt asserted at `interactions.test.ts:282` |
+### 10.3 Replace the three stock photographs
 
-`hero` gets a 2400w top rung because it is the only asset sized `100vw`. Its current top
-rung is `hero.jpg` at 2048w, and a 2400w rung supersedes it: the ladder becomes
-640/1024/1600/2400, `hero.src` points at `hero-2400.jpg`, and the redundant `hero.jpg` is
-deleted. That drops one row from `imageFiles` (`assets.test.ts:12`) and adds one to
-`generatedVariants`, and it keeps the ladder monotonic rather than
-640/1024/1600/2048/2400.
+**Gate for the whole image phase: `bun test tests/assets.test.ts` green.**
+
+| Slot | Used by | `src` width | Ladder | Test edits |
+|---|---|---|---|---|
+| `hero` | `/` main hero (`home-page.tsx:20`) | 2048 (unchanged) | 640/1024/1600/2048 (unchanged) | none |
+| `worshipMoment` | `/sermons` hero, `/about` (`:82`) | 1600 (was 6000) | 640/1024/1600 | `srcset` string, alt text |
+| `prayerFellowship` | `/`, `/events`, `/leadership` heroes | 1600 (was 6000) | 640/1024/1600 | `srcset` string, alt text |
+
+`hero` keeps its existing ladder exactly. It is tempting to add a 2400w rung because it is
+the only `sizes: 100vw` asset, but that would edit the exact-string assertion at
+`assets.test.ts:109-114` and the matching pair at `interactions.test.ts:166-168` for a
+marginal gain on displays that are already an accepted compromise. Out of scope; recorded
+in §13, item 5.
+
+For the other two, regenerating at 1600w and declaring `width: 1600, height: 1067` deletes
+10.4 MB and 11.8 MB from the repository and from every Docker image build, while keeping
+the §10.1 convention intact.
+
+`bibleStudy` needs no photograph work — §4.5 established it is out of the question, and
+its content file is already correct at 2048×1365. Its only change is the corrected
+declaration from §10.2 step 3.
 
 Selection procedure, because the agent will not choose photographs of the maintainer's
 congregation blind:
@@ -438,8 +468,8 @@ congregation blind:
 2. Shortlist three to five per slot, excluding blown highlights (`YHIGH` clipping),
    crushed shadows, and heavy motion blur.
 3. **The maintainer picks** from the shortlist.
-4. Generate rungs with §9, register in `imageAssetMap`, and propose alt text describing
-   what is actually in the chosen photograph, for maintainer approval.
+4. Generate the full ladder with §9, register in `imageAssetMap`, and propose alt text
+   describing what is actually in the chosen photograph, for maintainer approval.
 
 Alt text is rewritten because the current strings are assertions in
 `tests/interactions.test.ts:273-282` — `"A cross against the sky"` (`:273`, unchanged per
@@ -448,6 +478,7 @@ Alt text is rewritten because the current strings are assertions in
 
 Sources are read from `~/Desktop/kccf`. Only the selected photographs are copied into
 `static/images/`; the 6.6 GB working set never enters the repository.
+
 
 ## 11. Styling
 
@@ -475,9 +506,9 @@ breakpoint.
 | `pages.test.ts:122-131` | Update `expectInOrder` chain: "Featured Events" → "Upcoming Events", drop the empty-state strings, add "Past Events". Assert at least one upcoming and one past title render, and that no past title appears in the home teaser |
 | `pages.test.ts:37,47` | Home page: "Upcoming Events" heading retained; the `No upcoming events` assertion at `:47` is removed, since upcoming events now exist |
 | `routes.test.ts:81-93` | `past-events-title` resolves and is unique — no edit needed, but the new section is what it now checks |
-| `assets.test.ts` | §10.1 dimension corrections; §10.2 new rungs. `imageFiles` (`:7-15`) loses `prayer-fellowship.jpg`, `worship-moment.jpg`, and `hero.jpg`; `generatedVariants` (`:17-31`) gains `hero-2400` |
-| `interactions.test.ts:273-282` | Alt texts for `hero`, `worshipMoment`, `bibleStudy`; `prayerFellowship` per §10.2 |
-| `components.test.ts` | Event cards now emit `card event-card`; the `Card` srcset assertion at `:283-294` covers them |
+| `assets.test.ts` | §10.2 `bibleStudy` dimension correction. §10.3 updates the `worshipMoment` and `prayerFellowship` srcset strings and declared dimensions. **`hero` and `imageFiles` are untouched** — every file keeps its name, and no rung is added or removed |
+| `interactions.test.ts:273-282` | Alt texts for `hero` and `prayerFellowship` per §10.3. `bibleStudy` and `about` alt text unchanged. `:166-168` (hero `src`/srcset) needs **no** edit |
+| `components.test.ts` | **No change.** The `Card` assertion at `:283-294` renders a synthetic `/media` route (`components.test.ts:96`) with a hardcoded `about.jpg`, so it does not reach the events page. Event cards are covered by `pages.test.ts` assertions on rendered output instead |
 | `stylesheet.test.ts` | `.past-event-card` and `.event-recap` in both `src/input.css` and `static/style.css` |
 | `browser.test.ts` | No change. No new interaction, so the real-Chrome smoke is untouched |
 
@@ -493,8 +524,12 @@ None of these block implementation; the build is verifiable without them.
 3. **Specific future dates.** Carol Service and I AM Revival have none; Women's Anniversary
    and Christmas Service have months only.
 4. **Event photography and the gallery page.** Deliberately deferred (§3). The candidate
-   shortlist from §10.2 step 1 is reusable when that work starts.
-5. **Coordination with the sermon recordings spec.** That spec is written but **not
+   shortlist from §10.3 step 1 is reusable when that work starts.
+5. **A 2400w rung for `hero`.** The only `sizes: 100vw` asset tops out at 2048w, which is
+   soft on a large display. Adding a rung means editing the exact-string assertion at
+   `assets.test.ts:109-114` and the pair at `interactions.test.ts:166-168`. Deferred to
+   avoid unnecessary churn in this change.
+6. **Coordination with the sermon recordings spec.** That spec is written but **not
    implemented** — there is no `src/content/sermons.generated.json` and no `resolveSermons()`.
    It also edits `src/content/types.ts` and `src/content/sermons.ts`. Implementing both in
    sequence will need a merge decision on `types.ts`, since this spec replaces
@@ -506,8 +541,8 @@ None of these block implementation; the build is verifiable without them.
 |---|---|
 | A past event is mislabelled `upcoming` | `content.test.ts` asserts the two arrays partition `events` exactly; the rendered order is asserted in `pages.test.ts` |
 | An event is never promoted from `upcoming` to `past` | Inherent to the chosen design and accepted deliberately. It is an editorial act, and unlike a `Date.now()` comparison it can never happen silently or wrongly at 00:00 in the wrong timezone |
-| Losing the 22 MB of originals is noticed | `git show 9371ebb` still contains them, so recovery is a single checkout. Nothing references them after §10.1 |
-| `hero` looks soft at very wide viewports | `hero` keeps a 2400w top rung for exactly this reason; it is the only `sizes: 100vw` asset |
+| Losing the 22 MB of oversized originals is noticed | `git show 9371ebb` still contains them, so recovery is a single checkout. Nothing references them after §10.3 |
+| `hero` looks soft at very wide viewports | Pre-existing and unchanged by this work; the 2048w top rung is the current accepted state. Recorded in §13, item 5 |
 | An image with an EXIF rotation tag yields swapped dimensions | §9 step 3 warns; `assets.test.ts:167-175` fails loudly regardless |
 | Chosen photographs are technically sound but compositionally poor | The maintainer makes the final selection from a shortlist; the agent never chooses unilaterally |
-| Photo shortlist work is skipped under time pressure | The shortlist is a by-product of §10.2 step 1 and is reusable for the deferred gallery page (§13, item 4) |
+| Photo shortlist work is skipped under time pressure | The shortlist is a by-product of §10.3 step 1 and is reusable for the deferred gallery page (§13, item 4) |
