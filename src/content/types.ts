@@ -46,13 +46,23 @@ export type Sermon = {
   image: string;
 };
 
-export type FeaturedEvent = {
+export type EventStatus = "upcoming" | "past";
+
+export type ChurchEvent = {
+  /** Hand-set. Never derived from a date comparison; see CLAUDE.md. */
+  status: EventStatus;
   title: string;
-  date: string;
-  time: string;
+  /**
+   * Human display string, e.g. "September 20, 2026" or "November 2026".
+   * Omitted when the church has not announced a date. Never parsed.
+   */
+  date?: string;
+  /** Human display string, e.g. "10:00 PM". Omitted when not applicable. */
+  time?: string;
   location: string;
   description: string;
-  image: string;
+  /** Past only. What the gathering was about. */
+  recap?: string;
 };
 
 export type Leader = {
