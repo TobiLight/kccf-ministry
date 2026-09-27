@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const DEFAULT_WIDTHS = [640, 1024, 1600];
 
@@ -8,29 +8,68 @@ type Options = {
   baseName: string;
   widths: number[];
   outDir: string;
+  srcWidth?: number;
+  force: boolean;
+  constName?: string;
 };
+
+function fail(message: string): never {
+  console.error(`error: ${message}`);
+  process.exit(1);
+}
+
+function toCamelCase(value: string) {
+  return value.replace(/[^a-zA-Z0-9]+(.)?/g, (_match, char: string | undefined) => (char ? char.toUpperCase() : ""));
+}
 
 function parseArgs(argv: string[]): Options {
   const positional: string[] = [];
   let widths = DEFAULT_WIDTHS;
   let outDir = "static/images";
+  let srcWidth: number | undefined;
+  let force = false;
+  let constName: string | undefined;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    const next = () => {
+      const value = argv[index + 1];
+      if (value === undefined) fail(`${arg} requires a value`);
+      index += 1;
+      return value;
+    };
 
     if (arg === "--widths") {
-      const value = argv[index + 1];
-      if (!value) throw new Error("--widths requires a comma-separated list, e.g. --widths 640,1024");
-      widths = value.split(",").map((part) => Number.parseInt(part.trim(), 10));
-      index += 1;
+      widths = next()
+        .split(",")
+        .map((part) => {
+          const trimmed = part.trim();
+          if (!/^\d+$/.test(trimmed)) fail(`invalid width: "${part}" — expected a positive integer`);
+          return Number.parseInt(trimmed, 10);
+        })
+        .filter((width) => width > 0);
       continue;
     }
 
     if (arg === "--out") {
-      const value = argv[index + 1];
-      if (!value) throw new Error("--out requires a directory, e.g. --out static/images");
-      outDir = value;
-      index += 1;
+      outDir = next();
+      continue;
+    }
+
+    if (arg === "--src-width") {
+      const raw = next();
+      if (!/^\d+$/.test(raw)) fail(`invalid --src-width: "${raw}"`);
+      srcWidth = Number.parseInt(raw, 10);
+      continue;
+    }
+
+    if (arg === "--const-name") {
+      constName = next();
+      continue;
+    }
+
+    if (arg === "--force") {
+      force = true;
       continue;
     }
 
@@ -38,116 +77,135 @@ function parseArgs(argv: string[]): Options {
   }
 
   const [source, baseName] = positional;
-
   if (!source || !baseName) {
-    throw new Error("usage: image-variants <source> <base-name> [--widths 640,1024,1600] [--out static/images]");
+    fail("usage: image-variants <source> <base-name> [--widths 640,1024,1600] [--out static/images] [--src-width N] [--const-name name] [--force]");
   }
 
-  for (const width of widths) {
-    if (!Number.isInteger(width) || width <= 0) throw new Error(`invalid width: ${width}`);
-  }
-
-  return { source, baseName, widths, outDir };
+  return { source: source!, baseName: baseName!, widths: [...widths].sort((a, b) => a - b), outDir, srcWidth, force, constName };
 }
 
 async function run(command: string[]): Promise<string> {
   const proc = Bun.spawn(command, { stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
   const code = await proc.exited;
-
-  if (code !== 0) throw new Error(`${command[0]} exited ${code}: ${stderr.trim()}`);
-
+  if (code !== 0) fail(`${command[0]} exited ${code}: ${stderr.trim()}`);
   return stdout;
 }
 
 async function readJpegSize(path: string): Promise<{ width: number; height: number }> {
   const out = await run([
-    "ffprobe",
-    "-v",
-    "error",
-    "-select_streams",
-    "v:0",
-    "-show_entries",
-    "stream=width,height",
-    "-of",
-    "csv=p=0",
-    path,
+    "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", path,
   ]);
   const [width, height] = out.trim().split(",").map((part) => Number.parseInt(part.trim(), 10));
-
-  if (!width || !height) throw new Error(`could not read JPEG dimensions from ${path} (got "${out.trim()}")`);
-
-  return { width, height };
-}
-
-async function readRotationTag(path: string): Promise<string> {
-  const out = await run([
-    "ffprobe",
-    "-v",
-    "error",
-    "-select_streams",
-    "v:0",
-    "-show_entries",
-    "stream_tags=rotate:stream_side_data=rotation",
-    "-of",
-    "default=nw=1:nk=1",
-    path,
-  ]);
-  return out.trim();
+  if (!width || !height) fail(`could not read JPEG dimensions from ${path} (got "${out.trim()}")`);
+  return { width: width!, height: height! };
 }
 
 function scaleExpression(width: number): string {
-  // Round the height to an even number so the encoder gets well-formed chroma planes.
   return `scale=${width}:-2:flags=lanczos`;
 }
 
 const options = parseArgs(Bun.argv.slice(2));
 const sourcePath = resolve(options.source);
+const sourceSize = await readJpegSize(sourcePath).catch(() => fail(`cannot read source image: ${options.source}`));
+
+const srcWidth = options.srcWidth ?? sourceSize.width;
+if (srcWidth > sourceSize.width) {
+  fail(`--src-width ${srcWidth} is larger than the source (${sourceSize.width}px); refusing to upscale`);
+}
+
+for (const width of options.widths) {
+  if (width > sourceSize.width) {
+    fail(`requested width ${width} is larger than the source (${sourceSize.width}px); refusing to upscale`);
+  }
+}
+
+// A width equal to srcWidth is the full-size file's job, so it is never emitted twice.
+const variantWidths = options.widths.filter((width) => width < srcWidth);
+const skipped = options.widths.filter((width) => width >= srcWidth);
+
 const outDir = resolve(options.outDir);
+const srcFile = `${options.baseName}.jpg`;
+const srcTarget = join(outDir, srcFile);
+const srcExists = await Bun.file(srcTarget).exists();
 
-await mkdir(outDir, { recursive: true });
-
-const rotation = await readRotationTag(sourcePath);
-if (rotation && rotation !== "0" && !/Rotate: 0/.test(rotation)) {
-  console.warn(
-    `warning: ${options.source} carries a rotation tag (${rotation}). Confirm the printed width/height match the upright image.`,
+// The full-size file is the one output that cannot be re-derived safely, so it is
+// never overwritten without --force. Refusing unconditionally is stricter than
+// comparing widths and still covers a genuine native original of a different size.
+if (srcExists && !options.force) {
+  const existing = await readJpegSize(srcTarget);
+  fail(
+    `${options.outDir}/${srcFile} already exists at ${existing.width}px. ` +
+      `The full-size file is never overwritten without --force, so a native original cannot be lost to a re-encode. ` +
+      `Re-run with --force to replace it deliberately, or pick another --out.`,
   );
 }
 
+await mkdir(outDir, { recursive: true });
+
 const generated: Array<{ file: string; width: number }> = [];
 
-for (const width of options.widths) {
+for (const width of variantWidths) {
   const file = `${options.baseName}-${width}.jpg`;
-  const target = join(outDir, file);
-
-  await run(["ffmpeg", "-y", "-i", sourcePath, "-vf", scaleExpression(width), "-q:v", "4", target]);
-
-  const size = await readJpegSize(target);
-  if (size.width !== width) {
-    throw new Error(`${file} is ${size.width}px wide but ${width} was requested; check for EXIF rotation`);
-  }
-
+  await run(["ffmpeg", "-y", "-nostdin", "-i", sourcePath, "-vf", scaleExpression(width), "-q:v", "4", join(outDir, file)]);
+  const size = await readJpegSize(join(outDir, file));
+  if (size.width !== width) fail(`${file} is ${size.width}px wide but ${width} was requested; check for EXIF rotation`);
   generated.push({ file, width });
 }
 
-const srcWidth = Math.max(...options.widths);
-const srcFile = `${options.baseName}.jpg`;
-const srcTarget = join(outDir, srcFile);
+await run([
+  "ffmpeg",
+  options.force ? "-y" : "-n",
+  "-nostdin",
+  "-i",
+  sourcePath,
+  "-vf",
+  scaleExpression(srcWidth),
+  "-q:v",
+  "4",
+  srcTarget,
+]);
+const finalSrcSize = await readJpegSize(srcTarget);
+if (finalSrcSize.width !== srcWidth) fail(`${srcFile} is ${finalSrcSize.width}px wide but ${srcWidth} was requested`);
 
-await run(["ffmpeg", "-y", "-i", sourcePath, "-vf", scaleExpression(srcWidth), "-q:v", "4", srcTarget]);
+const identifier = options.constName ?? `${toCamelCase(options.baseName)}Srcset`;
+if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(identifier)) {
+  fail(`"${identifier}" is not a valid JavaScript identifier; pass --const-name with a valid name`);
+}
 
-const srcSize = await readJpegSize(srcTarget);
+// static/ is served from the project root, so a --out inside the project has a real
+// public path. A --out outside it has no URL yet, so fall back to the intended
+// destination and say loudly that the files are not there.
+const relativeOut = relative(resolve(import.meta.dir, ".."), outDir);
+const servable = relativeOut !== "" && !relativeOut.startsWith("..") && !isAbsolute(relativeOut);
+const servedDir = servable ? `/${relativeOut.split(sep).join("/")}` : "/static/images";
+const publicPath = (file: string) => `${servedDir}/${file}`;
+
+if (!servable) {
+  console.warn(
+    `warning: --out ${options.outDir} is outside the project, so nothing is served at the paths below. ` +
+      `Move the files into static/images before pasting this block.`,
+  );
+}
 
 console.log("");
 console.log(`// paste into imageAssetMap in src/content/site.ts`);
-console.log(`const ${options.baseName}Srcset = [`);
+console.log(`const ${identifier} = [`);
+console.log(`  "${publicPath(srcFile)} ${finalSrcSize.width}w",`);
 for (const entry of generated) {
-  console.log(`  "/static/images/${entry.file} ${entry.width}w",`);
+  console.log(`  "${publicPath(entry.file)} ${entry.width}w",`);
 }
-console.log(`  "/static/images/${srcFile} ${srcSize.width}w",`);
 console.log(`].join(", ");`);
 console.log("");
-console.log(`  src: "/static/images/${srcFile}",`);
-console.log(`  width: ${srcSize.width},`);
-console.log(`  height: ${srcSize.height},`);
+console.log(`  src: "${publicPath(srcFile)}",`);
+console.log(`  width: ${finalSrcSize.width},`);
+console.log(`  height: ${finalSrcSize.height},`);
+console.log(`  // sizes is a layout judgement — set it by hand, e.g. "(min-width: 64rem) 38rem, 92vw"`);
 console.log("");
+
+if (skipped.length > 0) {
+  console.log(`note: skipped width(s) ${skipped.join(", ")} because they are not narrower than --src-width ${srcWidth}.`);
+}
+if (!srcExists) {
+  console.log(`note: created ${options.outDir}/${srcFile}; pass --force to replace it in future runs.`);
+}
