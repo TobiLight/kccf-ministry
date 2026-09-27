@@ -873,6 +873,133 @@ git commit -m "feat: replace stock photography with church images"
 
 ---
 
+### Task 4b: Deliver the approved alt text and fix the footer aspect ratio
+
+Raised by the Task 4 review. The image work in Task 4 is correct and verified, but the approved alt text never reaches the four pages that display the new photographs, and a pre-existing footer bug keeps the accessibility suite red. The suite cannot go green without both.
+
+**Files:**
+- Modify: `src/components/pages/events-page.tsx:18`, `src/components/pages/leadership-page.tsx:16`, `src/components/pages/sermons-page.tsx:17`, `src/components/pages/about-page.tsx:82`, `src/components/pages/about-page.tsx:24`, `src/components/pages/ministries-page.tsx:15`, `src/components/pages/contact-page.tsx:32`
+- Modify: `src/components/site-footer.tsx:17`
+- Modify: `src/content/site.ts:49-61` (reorder the two new srcset literals)
+- Test: `tests/interactions.test.ts`
+
+**Interfaces:**
+- Consumes: the approved alt strings in `docs/photo-choices.md`, and the `worshipMomentSrcset` / `prayerFellowshipSrcset` literals written by Task 4.
+- Produces: every page rendering the asset map's `alt`; a green `tests/interactions.test.ts`; bare-file-last ordering on both new ladders.
+
+- [ ] **Step 1: Confirm the override mechanism**
+
+Run: `rg -n 'imageAlt=' src/components/pages/`
+Expected: six hits. `PageHero` resolves `imageAlt ?? imageAsset?.alt ?? ""` (`page-hero.tsx:14`), so each of these props silently overrides the asset map. The three that name their own images correctly (`about-page.tsx:24`, `ministries-page.tsx:15`, `contact-page.tsx:32`) are redundant copies of strings the asset map already holds; the other three are the stale stock text.
+
+- [ ] **Step 2: Write the failing test**
+
+Append to `tests/interactions.test.ts`:
+
+```ts
+test("no page hardcodes an alt string that the image asset map already owns", async () => {
+  const { site } = await import("../src/content/site");
+  const known = new Set(Object.values(site.imageAssets).map((asset) => asset.alt));
+
+  for (const path of ["/", "/about", "/ministries", "/sermons", "/events", "/leadership", "/contact"]) {
+    const { html } = await getPage(path);
+
+    for (const image of [...html.matchAll(/<img\b[^>]*>/g)].map((match) => match[0])) {
+      const alt = image.match(/\balt="([^"]*)"/)?.[1] ?? "";
+
+      if (alt.length > 0) {
+        expect(known.has(alt)).toBe(true);
+      }
+    }
+  }
+});
+```
+
+This asserts the invariant that makes the bug impossible to reintroduce: **every non-empty `alt` on a page must be a string the asset map owns.** Page-specific prose that differs from the image needs a genuinely new asset, not a duplicated literal.
+
+- [ ] **Step 3: Run the test to verify it fails**
+
+Run: `bun test tests/interactions.test.ts 2>&1 | tail -20`
+Expected: FAIL, naming at least `"People holding hands in prayer"` and `"Hands raised in worship"`.
+
+- [ ] **Step 4: Delete the five redundant `imageAlt` props**
+
+Remove the `imageAlt` line from each of these `PageHero` call sites:
+
+- `events-page.tsx:18`
+- `leadership-page.tsx:16`
+- `sermons-page.tsx:17`
+- `about-page.tsx:24`
+- `ministries-page.tsx:15`
+- `contact-page.tsx:32`
+
+Each page then falls through to `imageAsset.alt`. For `about-page.tsx:24` and `contact-page.tsx:32` the rendered string is unchanged (`"A cross against the sky"` is what `site.ts:83` already says), and for `ministries-page.tsx:15` it is unchanged (`"Hands resting on an open Bible"` is `site.ts:95`).
+
+- [ ] **Step 5: Fix the one bare `<img>` that has no fallback**
+
+`about-page.tsx:82` is a bare `<img>` with `getImageSource`, not a `PageHero`, so it has no automatic fallback. Replace its hardcoded `alt` with a read from the asset map. Add `getImageAsset` to that file's import from `../../content/site`:
+
+```tsx
+              {...getImageSource(site.images.worshipMoment, "(min-width: 48rem) 50vw, 92vw")}
+              alt={getImageAsset(site.images.worshipMoment)?.alt ?? ""}
+```
+
+- [ ] **Step 6: Fix the footer aspect-ratio distortion**
+
+`site-footer.tsx:17-18` renders `width={site.imageAssets.logo.width * 2}` (400) against `height` 200, on a 200×200 source — a 2:1 distortion. Display size is governed by the `w-35 h-35` classes, so the attributes exist for aspect ratio and must match the source. Change line 17 to:
+
+```tsx
+              width={site.imageAssets.logo.width}
+```
+
+- [ ] **Step 7: Reorder the two new srcset literals to bare-file-last**
+
+The repo's pre-existing convention, verified at commit `d845194` for all four ladders, is **ascending descriptors with the bare file last**. Task 4 wrote the two new ones bare-first. Reorder them in `src/content/site.ts`:
+
+```ts
+const worshipMomentSrcset = [
+  "/static/images/worship-moment-640.jpg 640w",
+  "/static/images/worship-moment-1024.jpg 1024w",
+  "/static/images/worship-moment.jpg 1600w",
+].join(", ");
+```
+
+```ts
+const prayerFellowshipSrcset = [
+  "/static/images/prayer-fellowship-640.jpg 640w",
+  "/static/images/prayer-fellowship-1024.jpg 1024w",
+  "/static/images/prayer-fellowship.jpg 1600w",
+].join(", ");
+```
+
+Leave `heroSrcset` and `aboutSrcset` untouched; `assets.test.ts:109-114` pins `hero`'s exact string.
+
+- [ ] **Step 8: Run the accessibility suite**
+
+Run: `bun test tests/interactions.test.ts`
+Expected: PASS, including the pre-existing assertions at `:273` and `:279` (`about` and `bibleStudy` alt text, unchanged) and the two Task 4 assertions at `:276` and `:282`, which now have a matching implementation.
+
+- [ ] **Step 9: Run the full suite**
+
+Run: `bun test`
+Expected: exactly **one** failure — the maintainer's `tests/browser.test.ts` `brandVisible` assertion from `ae1aef0`, which is not this plan's to fix. `assets.test.ts` and `interactions.test.ts` both green.
+
+- [ ] **Step 10: Verify no stale alt string survives anywhere**
+
+Run: `rg -n 'People holding hands in prayer|Hands raised in worship' src/ docs/photo-choices.md`
+Expected: no hits in `src/`. The only permitted mention is `docs/photo-choices.md`, which records the old string as the falsehood it replaced.
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add src/components/pages src/components/site-footer.tsx src/content/site.ts tests/interactions.test.ts
+git commit -m "fix: deliver approved alt text and correct footer logo aspect ratio"
+```
+
+---
+
+---
+
 ### Task 5: Introduce the `ChurchEvent` type
 
 Renames the type and makes `date`/`time` optional, because three of the four upcoming events have neither. `status` is hand-set and is the only past/upcoming discriminator the codebase will ever have.
