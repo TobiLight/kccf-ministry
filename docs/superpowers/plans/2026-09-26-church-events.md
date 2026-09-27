@@ -998,8 +998,6 @@ git commit -m "fix: deliver approved alt text and correct footer logo aspect rat
 
 ---
 
----
-
 ### Task 5: Introduce the `ChurchEvent` type
 
 Renames the type and makes `date`/`time` optional, because three of the four upcoming events have neither. `status` is hand-set and is the only past/upcoming discriminator the codebase will ever have.
