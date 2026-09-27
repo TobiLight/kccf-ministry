@@ -127,6 +127,7 @@ describe("site content", () => {
       "September 20, 2026 · 10:00 PM",
     );
     expect(formatEventSchedule({ ...events[0], date: "November 2026", time: undefined })).toBe("November 2026");
+    expect(formatEventSchedule({ ...events[0], date: undefined, time: "10:00 PM" })).toBe("10:00 PM");
     expect(formatEventSchedule({ ...events[0], date: undefined, time: undefined })).toBe("Date to be announced");
   });
 

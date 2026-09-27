@@ -44,9 +44,21 @@ describe("home page", () => {
     expect(html).toContain("Bible Study");
     expect(html).toContain("Bishop Olayinka Adeyinka");
     expect(html).toContain("Pastor David Bodunrin");
-    expect(html).toContain("No upcoming events");
+    expect(html).toContain("I AM Revival");
+    expect(html).toContain("Carol Service");
+    expect(html).not.toContain("No upcoming events");
     expect(html).toContain("href=\"/contact\"");
     expect(html).toContain("href=\"/sermons\"");
+  });
+
+  test("shows only upcoming events in the home teaser", async () => {
+    const { html } = await getPage("/");
+
+    expect(html).toContain("Upcoming Events");
+    expect(html).toContain("Carol Service");
+    expect(html).not.toContain("Annual Church Thanksgiving Anniversary");
+    expect(html).not.toContain("Children&#39;s Anniversary");
+    expect(html).not.toContain("Past Events");
   });
 });
 
@@ -120,13 +132,48 @@ describe("sermons page", () => {
 });
 
 describe("events page", () => {
-  test("renders regular services, the featured empty state, and contact CTA", async () => {
+  test("renders regular services, upcoming events, and past events in order", async () => {
     const { html, main } = await getPage("/events");
 
-    expectInOrder(main, ["Events", "Sunday Worship", "Wednesday Throne of Grace", "Transformation Night", "Featured Events", "No upcoming events", "Contact Us"]);
+    // Titles containing an apostrophe are matched as the entity the renderer emits.
+    expectInOrder(main, [
+      "Events",
+      "Sunday Worship",
+      "Wednesday Throne of Grace",
+      "Transformation Night",
+      "Upcoming Events",
+      "I AM Revival",
+      "Women&#39;s Anniversary",
+      "Christmas Service",
+      "Past Events",
+      "Annual Church Thanksgiving Anniversary",
+      "Children&#39;s Anniversary",
+    ]);
     expect(html).toContain("Every 1st Thursday Transformation Night");
     expect(html).toContain("10:00 PM");
     expect(html).not.toContain("Weekly gathering");
+  });
+
+  test("labels unannounced dates instead of rendering an empty schedule", async () => {
+    const { html } = await getPage("/events");
+
+    expect(html).toContain("Date to be announced");
+    expect(html).not.toContain("undefined");
+  });
+
+  test("renders event cards through the shared Card component", async () => {
+    const { html } = await getPage("/events");
+
+    expect(html).toContain('class="card event-card"');
+    expect(html).toContain('class="card past-event-card"');
+    expect(html).not.toContain('class="event-card"');
+  });
+
+  test("gives the past events section a resolvable unique heading id", async () => {
+    const { html } = await getPage("/events");
+
+    expect(html).toContain('aria-labelledby="past-events-title"');
+    expect(html).toContain('id="past-events-title"');
   });
 });
 

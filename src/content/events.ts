@@ -68,7 +68,7 @@ export const events: ChurchEvent[] = [
     title: "Christmas Service",
     date: "December 2026",
     location: "KCCF Mount Zion, Ikotun, Lagos",
-    description: "Celebrating the birth of Christ with worship and the Word. Date to be announced.",
+    description: "Celebrating the birth of Christ with worship and the Word.",
   },
 ];
 

@@ -1,4 +1,4 @@
-import { events } from "../../content/events";
+import { formatEventSchedule, upcomingEvents } from "../../content/events";
 import { leadership } from "../../content/leadership";
 import { ministries } from "../../content/ministries";
 import { getImageAsset, getResponsiveSourceSet, site } from "../../content/site";
@@ -168,10 +168,15 @@ export function HomePage() {
               View all events
             </ButtonLink>
           </div>
-          {events.length > 0 ? (
+          {upcomingEvents.length > 0 ? (
             <div class="card-grid card-grid-three">
-              {events.slice(0, 3).map((event) => (
-                <Card image={event.image} title={event.title} description={`${event.date} · ${event.time}`} />
+              {upcomingEvents.slice(0, 3).map((event) => (
+                <Card
+                  className="event-card"
+                  eyebrow={formatEventSchedule(event)}
+                  title={event.title}
+                  description={event.description}
+                />
               ))}
             </div>
           ) : (

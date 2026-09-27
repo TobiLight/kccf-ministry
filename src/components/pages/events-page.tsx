@@ -1,8 +1,8 @@
 import { ButtonLink } from "../ui/button-link";
-import { getImageAsset } from "../../content/site";
 import { PageHero } from "../ui/page-hero";
 import { SectionHeading } from "../ui/section-heading";
-import { events, monthlyService } from "../../content/events";
+import { Card } from "../ui/card";
+import { formatEventSchedule, monthlyService, pastEvents, upcomingEvents } from "../../content/events";
 import { site } from "../../content/site";
 
 const regularServices = [...site.services.slice(0, 2), monthlyService];
@@ -45,34 +45,24 @@ export function EventsPage() {
             <SectionHeading
               id="featured-events-title"
               eyebrow="Special gatherings"
-              title="Featured Events"
-              description="We will share details for special worship, conferences, and community gatherings here."
+              title="Upcoming Events"
+              description="Join us for the gatherings we have announced. Details for each one appear here as they are confirmed."
             />
             <ButtonLink className="text-link" href="/contact" icon="arrow-right">
               Ask about an event
             </ButtonLink>
           </div>
-          {events.length > 0 ? (
+          {upcomingEvents.length > 0 ? (
             <div class="card-grid card-grid-three">
-              {events.map((event) => (
-                <article class="event-card">
-                  <img
-                    class="card-image"
-                    src={event.image}
-                    alt=""
-                    width={getImageAsset(event.image)?.width}
-                    height={getImageAsset(event.image)?.height}
-                    loading="lazy"
-                  />
-                  <div class="card-content">
-                    <p class="eyebrow">
-                      {event.date} · {event.time}
-                    </p>
-                    <h3>{event.title}</h3>
-                    <p>{event.description}</p>
-                    <p class="event-location">{event.location}</p>
-                  </div>
-                </article>
+              {upcomingEvents.map((event) => (
+                <Card
+                  className="event-card"
+                  eyebrow={formatEventSchedule(event)}
+                  title={event.title}
+                  description={event.description}
+                >
+                  <p class="event-location">{event.location}</p>
+                </Card>
               ))}
             </div>
           ) : (
@@ -86,6 +76,37 @@ export function EventsPage() {
               <ButtonLink className="button button-secondary" href="/contact" icon="arrow-right">
                 Contact Us
               </ButtonLink>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section class="past-events-section section-cream" aria-labelledby="past-events-title">
+        <div class="container">
+          <SectionHeading
+            id="past-events-title"
+            eyebrow="Recent history"
+            title="Past Events"
+            description="A look back at the gatherings that have brought our church family together."
+          />
+          {pastEvents.length > 0 ? (
+            <div class="card-grid card-grid-three">
+              {pastEvents.map((event) => (
+                <Card
+                  className="past-event-card"
+                  eyebrow={formatEventSchedule(event)}
+                  title={event.title}
+                  description={event.description}
+                >
+                  {event.recap ? <p class="event-recap">{event.recap}</p> : null}
+                  <p class="event-location">{event.location}</p>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div class="empty-state">
+              <p class="eyebrow">Coming soon</p>
+              <h3>No past events listed yet</h3>
             </div>
           )}
         </div>
