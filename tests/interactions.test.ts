@@ -273,13 +273,13 @@ describe("rendered accessibility contract", () => {
         expect(html).toContain('alt="A cross against the sky"');
       }
       if (path === "/") {
-        expect(html).toContain('alt="Congregation"');
+        expect(html).toContain('alt="Congregation standing together during a Sunday service"');
       }
       if (path === "/ministries") {
         expect(html).toContain('alt="Hands resting on an open Bible"');
       }
       if (path === "/events") {
-        expect(html).toContain('alt="People holding hands in prayer"');
+        expect(html).toContain('alt="A member of the congregation greeting children during a church service"');
       }
       if (path === "/" || path === "/about" || path === "/contact") {
         expect(html).toContain('fetchpriority="high"');

@@ -24,10 +24,8 @@ const generatedVariants = [
   { file: "hero-1600.jpg", width: 1600 },
   { file: "worship-moment-640.jpg", width: 640 },
   { file: "worship-moment-1024.jpg", width: 1024 },
-  { file: "worship-moment-1600.jpg", width: 1600 },
   { file: "prayer-fellowship-640.jpg", width: 640 },
   { file: "prayer-fellowship-1024.jpg", width: 1024 },
-  { file: "prayer-fellowship-1600.jpg", width: 1600 },
 ] as const;
 
 const aboutVariants = generatedVariants.filter((variant) => variant.file.startsWith("about-"));
