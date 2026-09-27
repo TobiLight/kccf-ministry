@@ -47,15 +47,15 @@ const heroSrcset = [
 ].join(", ");
 
 const worshipMomentSrcset = [
-  "/static/images/worship-moment.jpg 1600w",
   "/static/images/worship-moment-640.jpg 640w",
   "/static/images/worship-moment-1024.jpg 1024w",
+  "/static/images/worship-moment.jpg 1600w",
 ].join(", ");
 
 const prayerFellowshipSrcset = [
-  "/static/images/prayer-fellowship.jpg 1600w",
   "/static/images/prayer-fellowship-640.jpg 640w",
   "/static/images/prayer-fellowship-1024.jpg 1024w",
+  "/static/images/prayer-fellowship.jpg 1600w",
 ].join(", ");
 
 const imageAssetMap = {

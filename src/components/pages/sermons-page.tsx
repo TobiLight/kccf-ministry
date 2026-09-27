@@ -14,7 +14,6 @@ export function SermonsPage() {
         title="Sermons"
         description="Feed your faith with messages that speak to the ordinary and extraordinary places where you live."
         image={site.images.worshipMoment}
-        imageAlt="Hands raised in worship"
       />
 
       <section class="live-banner-section">

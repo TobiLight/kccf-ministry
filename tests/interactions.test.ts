@@ -292,4 +292,21 @@ describe("rendered accessibility contract", () => {
 
     expect(response.status).toBe(404);
   });
+
+  test("no page hardcodes an alt string that the image asset map already owns", async () => {
+    const { site } = await import("../src/content/site");
+    const known = new Set(Object.values(site.imageAssets).map((asset) => asset.alt));
+
+    for (const path of ["/", "/about", "/ministries", "/sermons", "/events", "/leadership", "/contact"]) {
+      const { html } = await getPage(path);
+
+      for (const image of [...html.matchAll(/<img\b[^>]*>/g)].map((match) => match[0])) {
+        const alt = image.match(/\balt="([^"]*)"/)?.[1] ?? "";
+
+        if (alt.length > 0) {
+          expect(known.has(alt)).toBe(true);
+        }
+      }
+    }
+  });
 });

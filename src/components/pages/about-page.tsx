@@ -1,5 +1,5 @@
 import { ButtonLink } from "../ui/button-link";
-import { getImageSource } from "../../content/site";
+import { getImageAsset, getImageSource } from "../../content/site";
 import { Card } from "../ui/card";
 import { PageHero } from "../ui/page-hero";
 import { SectionHeading } from "../ui/section-heading";
@@ -21,7 +21,6 @@ export function AboutPage() {
         title="About KCCF"
         description="A Covenant Community Rooted in Christ, gathering in Lagos to worship, serve, and grow together."
         image={site.images.about}
-        imageAlt="A cross against the sky"
       />
 
       <section class="calling-section section-cream" aria-labelledby="calling-title">
@@ -80,7 +79,7 @@ export function AboutPage() {
             <img
               class="editorial-image"
               {...getImageSource(site.images.worshipMoment, "(min-width: 48rem) 50vw, 92vw")}
-              alt="Hands raised in worship"
+              alt={getImageAsset(site.images.worshipMoment)?.alt ?? ""}
               loading="lazy"
             />
             <div class="image-caption">Rooted in grace</div>
