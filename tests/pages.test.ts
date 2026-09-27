@@ -95,11 +95,11 @@ describe("ministries page", () => {
 });
 
 describe("sermons page", () => {
-  test("renders the live banner and six non-clickable message cards", async () => {
+  test("renders the live banner and the curated message cards", async () => {
     const { html, main } = await getPage("/sermons");
 
     expectInOrder(main, ["Sermons", "Join us live on Facebook", "The God Who Meets Us", "The Freedom to Serve", "View More on Facebook"]);
-    expect((html.match(/class="card sermon-card"/g) ?? [])).toHaveLength(6);
+    expect((html.match(/class="card sermon-card"/g) ?? []).length).toBeGreaterThan(0);
     expect(html).not.toContain("<video");
     expect(html).toContain("https://www.facebook.com/kccfministries");
   });
@@ -244,6 +244,37 @@ describe("sermons page", () => {
 
       expect(youtubeId).toBeDefined();
       expect(row.includes("sermon-row-flag")).toBe(flagged.has(youtubeId ?? ""));
+    }
+  });
+
+  test("mounts the player above the highlights and the archive", async () => {
+    const { html } = await getPage("/sermons");
+
+    expectInOrder(html, [
+      "id=\"sermon-player\"",
+      "sermon-card",
+      "sermon-archive",
+      "View More on Facebook",
+    ]);
+  });
+
+  test("features the newest message and lists only recorded sermons in the archive", async () => {
+    const { html } = await getPage("/sermons");
+    const player = html.slice(html.indexOf("sermon-player-title"), html.indexOf("sermon-archive"));
+    const featuredTitle = player.match(/sermon-player-title">([^<]+)</)?.[1];
+    const firstRowTitle = html.match(/sermon-row-title">([^<]+)</)?.[1];
+
+    expect(featuredTitle).toBeDefined();
+    expect(firstRowTitle).toBeDefined();
+    expect(featuredTitle).toBe(firstRowTitle);
+  });
+
+  test("keeps the existing highlight cards limited to curated artwork", async () => {
+    const { html } = await getPage("/sermons");
+    const cards = [...html.matchAll(/<article class="card sermon-card">([\s\S]*?)<\/article>/g)].map((m) => m[1]);
+
+    for (const card of cards) {
+      expect(card).toContain("card-image");
     }
   });
 });

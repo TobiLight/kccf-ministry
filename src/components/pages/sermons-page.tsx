@@ -3,10 +3,20 @@ import { Card } from "../ui/card";
 import { Icon } from "../ui/icon";
 import { PageHero } from "../ui/page-hero";
 import { SectionHeading } from "../ui/section-heading";
+import { SermonArchive } from "../ui/sermon-archive";
+import { SermonPlayer } from "../ui/sermon-player";
+import { formatSermonDate, resolveSermons } from "../../content/sermon-feed";
+import snapshot from "../../content/sermons.generated.json";
 import { sermons } from "../../content/sermons";
 import { site } from "../../content/site";
 
 export function SermonsPage() {
+  const all = resolveSermons(sermons, snapshot);
+  const playable = all.filter((sermon) => sermon.youtubeId);
+  const [featured] = playable;
+  const highlights = sermons.filter((sermon) => sermon.image);
+  const archive = all.filter((sermon) => sermon.youtubeId || sermon.facebookUrl);
+
   return (
     <>
       <PageHero
@@ -39,26 +49,54 @@ export function SermonsPage() {
         </div>
       </section>
 
-      <section class="sermon-list-section section-cream" aria-labelledby="sermon-list-title">
+      {playable.length > 0 ? (
+        <section class="sermon-feature-section" aria-labelledby="featured-message-title">
+          <div class="container">
+            <SectionHeading
+              id="featured-message-title"
+              eyebrow="Latest message"
+              title="Watch the Latest"
+              description="Press play to watch here, or open the recording on YouTube."
+            />
+            <SermonPlayer sermon={featured} />
+          </div>
+        </section>
+      ) : null}
+
+      {highlights.length > 0 ? (
+        <section class="sermon-list-section section-cream" aria-labelledby="sermon-highlights-title">
+          <div class="container">
+            <SectionHeading
+              id="sermon-highlights-title"
+              eyebrow="Highlights"
+              title="A Word for the Journey"
+              description="Messages that have stayed with us, on grace, prayer, purpose, and service."
+            />
+            <div class="card-grid card-grid-three">
+              {highlights.map((sermon) => (
+                <Card
+                  className="sermon-card"
+                  image={sermon.image}
+                  title={sermon.title}
+                  description={[sermon.speaker, formatSermonDate(sermon.date)].filter(Boolean).join(" · ")}
+                >
+                  <p>{sermon.summary}</p>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section class="sermon-archive-section" aria-labelledby="sermon-archive-title">
         <div class="container">
           <SectionHeading
-            id="sermon-list-title"
-            eyebrow="Recent messages"
-            title="A Word for the Journey"
-            description="Our latest messages are reflections on faith, grace, prayer, purpose, and service."
+            id="sermon-archive-title"
+            eyebrow="Archive"
+            title="Every Recorded Message"
+            description="Browse the archive by year. New recordings appear here as soon as they are published."
           />
-          <div class="card-grid card-grid-three">
-            {sermons.map((sermon) => (
-              <Card
-                className="sermon-card"
-                image={sermon.image}
-                title={sermon.title}
-                description={`${sermon.speaker} · ${sermon.date}`}
-              >
-                <p>{sermon.summary}</p>
-              </Card>
-            ))}
-          </div>
+          <SermonArchive sermons={archive} />
           <div class="center-action">
             <ButtonLink
               className="button button-secondary"
