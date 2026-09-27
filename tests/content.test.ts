@@ -32,6 +32,25 @@ type SermonSnapshotLike = {
 
 const feedXml = await readFile(new URL("./fixtures/sermons-feed.xml", import.meta.url), "utf8");
 
+function feedWithVideoIds(...videoIds: string[]) {
+  const entries = videoIds.map(
+    (videoId) => `  <entry>
+    <yt:videoId>${videoId}</yt:videoId>
+    <title>KCCF Ministries Live Stream</title>
+    <published>2026-09-20T13:02:55+00:00</published>
+    <media:description>18th Annual Anniversary</media:description>
+  </entry>`,
+  );
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/">',
+    "  <title>KCCF Ministries</title>",
+    ...entries,
+    "</feed>",
+  ].join("\n");
+}
+
 const internalRoutes = ["/", "/about", "/ministries", "/sermons", "/events", "/leadership", "/contact"];
 
 export const canonicalAddress =
@@ -194,6 +213,38 @@ describe("sermon feed derivation", () => {
 
     expect(() => parseFeed(entriesWithoutVideoId)).toThrow(/no usable video id/i);
     expect(() => parseFeed('<feed xmlns="http://www.w3.org/2005/Atom"></feed>')).toThrow(/no entries/i);
+  });
+
+  test("refuses a feed whose video id is not a bare YouTube id rather than dropping the entry", () => {
+    const malformedIds = [
+      "abc'd;alert(1)//",
+      "abc def",
+      "a<b",
+      "abc",
+      "abcde",
+      "abc$d",
+    ];
+
+    for (const malformedId of malformedIds) {
+      expect(() => parseFeed(feedWithVideoIds(malformedId))).toThrow(FeedError);
+      expect(() => parseFeed(feedWithVideoIds(malformedId))).toThrow(/malformed video id/i);
+    }
+  });
+
+  test("names the malformed video id in the refusal so a hostile feed is diagnosable", () => {
+    expect(() => parseFeed(feedWithVideoIds("abc'd;alert(1)//"))).toThrow(/abc'd;alert\(1\)\/\//);
+    expect(() => parseFeed(feedWithVideoIds("abc def"))).toThrow(/abc def/);
+  });
+
+  test("refuses the whole document when one entry carries a malformed id beside valid ones", () => {
+    expect(() => parseFeed(feedWithVideoIds("2zFODEV22G0", "abc def", "45e5ZCa-7Sg"))).toThrow(FeedError);
+  });
+
+  test("still accepts conforming video ids of every allowed shape", () => {
+    const ids = ["2zFODEV22G0", "GUup6e4Ccp0", "a_b-C1234", "zWoO2YLWi_Q"];
+
+    expect(parseFeed(feedWithVideoIds(...ids)).map((entry) => entry.youtubeId)).toEqual(ids);
+    expect(parseFeed(feedXml)).toHaveLength(7);
   });
 
   test("takes the title from the first description line, not the useless feed title", () => {

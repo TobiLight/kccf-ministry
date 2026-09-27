@@ -32,6 +32,8 @@ export class FeedError extends Error {
 
 const PERSON_TITLES = ["bishop", "pastor", "bro", "minister", "dr", "apostle", "rev"];
 
+const videoIdPattern = /^[A-Za-z0-9_-]{6,}$/;
+
 function decodeXml(value: string): string {
   const cdata = value.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/);
   const text = cdata ? cdata[1] : value;
@@ -63,22 +65,30 @@ export function parseFeed(xml: string): RawFeedEntry[] {
     throw new FeedError("feed contains no entries");
   }
 
-  const entries = blocks
-    .map((block) => ({
-      youtubeId: tagText(block, "yt:videoId"),
-      title: tagText(block, "title"),
-      published: tagText(block, "published"),
-      description: tagText(block, "media:description"),
-    }))
-    .filter((entry) => entry.youtubeId.length > 0);
+  const entries = blocks.map((block) => ({
+    youtubeId: tagText(block, "yt:videoId"),
+    title: tagText(block, "title"),
+    published: tagText(block, "published"),
+    description: tagText(block, "media:description"),
+  }));
 
-  if (entries.length === 0) {
+  for (const entry of entries) {
+    if (entry.youtubeId && !videoIdPattern.test(entry.youtubeId)) {
+      throw new FeedError(
+        `feed carries the malformed video id ${JSON.stringify(entry.youtubeId)}, so it is broken or hostile and nothing was ingested`,
+      );
+    }
+  }
+
+  const usable = entries.filter((entry) => entry.youtubeId.length > 0);
+
+  if (usable.length === 0) {
     throw new FeedError(
       `feed has ${blocks.length} <entry> block(s) but no usable video id in any of them, so the feed shape or namespace changed`,
     );
   }
 
-  return entries;
+  return usable;
 }
 
 function looksLikeSpeaker(line: string): boolean {

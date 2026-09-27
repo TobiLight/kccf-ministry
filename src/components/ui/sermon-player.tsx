@@ -25,7 +25,7 @@ export function SermonPlayer({ sermon, className = "" }: SermonPlayerProps) {
     <button
       type="button"
       class="sermon-facade-play"
-      data-on:click={`$sermon.videoId = '${sermon.youtubeId}'`}
+      data-on:click={`$sermon.videoId = ${JSON.stringify(sermon.youtubeId)}`}
       aria-label={`Play message: ${sermon.title}`}
     >
       <Icon name="play" size={24} />

@@ -37,7 +37,7 @@ function playAction(sermon: Sermon) {
       <button
         type="button"
         class="sermon-row-play"
-        data-on:click={`$sermon.videoId = '${sermon.youtubeId}'; document.getElementById('sermon-player')?.focus()`}
+        data-on:click={`$sermon.videoId = ${JSON.stringify(sermon.youtubeId)}; document.getElementById('sermon-player')?.focus()`}
         aria-label={`Play ${sermon.title} in the player above`}
       >
         <Icon name="play" size={18} />

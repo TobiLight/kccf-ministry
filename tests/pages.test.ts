@@ -160,7 +160,7 @@ describe("sermons page", () => {
     const click = html.match(/class="sermon-facade-play"[^>]*data-on:click="([^"]+)"/)?.[1];
 
     expect(click).toBeDefined();
-    expect(click).toMatch(/^\$sermon\.videoId = &#39;[^&#]+&#39;$/);
+    expect(click).toMatch(/^\$sermon\.videoId = &quot;[A-Za-z0-9_-]{6,}&quot;$/);
     expect(html).not.toMatch(/data-on:click="[^"]*undefined/);
   });
 
@@ -211,12 +211,12 @@ describe("sermons page", () => {
     const { html } = await getPage("/sermons");
     const control = html.match(/<button[^>]*class="sermon-row-play"[^>]*>[\s\S]*?<\/button>/)?.[0];
     const click = control?.match(/data-on:click="([^"]+)"/)?.[1];
-    const videoId = control?.match(/\$sermon\.videoId = &#39;([^&#]+)&#39;/)?.[1];
+    const videoId = control?.match(/\$sermon\.videoId = &quot;([^&]+)&quot;/)?.[1];
     const label = control?.match(/aria-label="([^"]+)"/)?.[1];
 
     expect(control).toBeDefined();
     expect(click).toMatch(
-      /^\$sermon\.videoId = &#39;[^&#]+&#39;; document\.getElementById\(&#39;sermon-player&#39;\)\?\.focus\(\)$/,
+      /^\$sermon\.videoId = &quot;[A-Za-z0-9_-]{6,}&quot;; document\.getElementById\(&#39;sermon-player&#39;\)\?\.focus\(\)$/,
     );
     expect(videoId).toBeDefined();
     expect(videoId).not.toBe("");
