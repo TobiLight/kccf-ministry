@@ -636,19 +636,19 @@ Regenerate any of these with:
 
 ## hero
 
-- Source: `~/Desktop/kccf/praise night/DSC_0084.jpg`
+- Source: `~/Desktop/kccf/DSC_0334.jpg`
 - Measured: YAVG 112.4, YLOW 31, YHIGH 232
 - Alt: `Congregation worshipping with hands raised during a Sunday service`
 
 ## worshipMoment
 
-- Source: `~/Desktop/kccf/praise night/DSC_0244.jpg`
+- Source: `~/Desktop/kccf/DSC_0292.jpg`
 - Measured: YAVG 118.9, YLOW 27, YHIGH 227
 - Alt: `Congregation with hands raised in worship`
 
 ## prayerFellowship
 
-- Source: `~/Desktop/kccf/praise night/DSC_0391.jpg`
+- Source: `~/Desktop/kccf/DSC_0145.jpg`
 - Measured: YAVG 105.2, YLOW 33, YHIGH 229
 - Alt: `Members of the congregation holding hands in prayer`
 
@@ -703,7 +703,7 @@ Substitute each source path from `docs/photo-choices.md`. Every command passes `
 - [ ] **Step 3: Generate the `hero` ladder — shape unchanged**
 
 ```bash
-bun run scripts/image-variants.ts "$HOME/Desktop/kccf/praise night/DSC_0084.jpg" hero --widths 640,1024,1600 --src-width 2048 --out static/images --force
+bun run scripts/image-variants.ts "$HOME/Desktop/kccf/DSC_0334.jpg" hero --widths 640,1024,1600 --src-width 2048 --out static/images --force
 ```
 
 This reproduces the committed `hero` shape exactly — bare file at 2048w as `src` and top ladder entry, rungs at 640/1024/1600 — so `site.ts`'s `heroSrcset` and the assertions at `assets.test.ts:109-114` and `interactions.test.ts:166-168` need **no** edit.
@@ -711,7 +711,7 @@ This reproduces the committed `hero` shape exactly — bare file at 2048w as `sr
 - [ ] **Step 4: Generate the `worshipMoment` ladder at 1600**
 
 ```bash
-bun run scripts/image-variants.ts "$HOME/Desktop/kccf/praise night/DSC_0244.jpg" worship-moment --widths 640,1024 --src-width 1600 --out static/images --force
+bun run scripts/image-variants.ts "$HOME/Desktop/kccf/DSC_0292.jpg" worship-moment --widths 640,1024 --src-width 1600 --out static/images --force
 ```
 
 `--widths` omits 1600 because the bare file *is* the 1600 rung; requesting it would emit two entries with the same descriptor. This replaces the 11.8 MB 6000×4000 original with a 1600w file.
@@ -719,7 +719,7 @@ bun run scripts/image-variants.ts "$HOME/Desktop/kccf/praise night/DSC_0244.jpg"
 - [ ] **Step 5: Generate the `prayerFellowship` ladder at 1600**
 
 ```bash
-bun run scripts/image-variants.ts "$HOME/Desktop/kccf/praise night/DSC_0391.jpg" prayer-fellowship --widths 640,1024 --src-width 1600 --out static/images --force
+bun run scripts/image-variants.ts "$HOME/Desktop/kccf/DSC_0145.jpg" prayer-fellowship --widths 640,1024 --src-width 1600 --out static/images --force
 ```
 
 - [ ] **Step 6: Confirm every generated file has its declared width**
@@ -1000,7 +1000,7 @@ Replace the `intentionally has no featured events yet` test at `:87-89` with:
     const dates = pastEvents.map((event) => event.date);
     expect(dates).toEqual([
       "September 20, 2026",
-      "September 20, 2025",
+      "September 21, 2025",
       "September 19, 2025",
       "July 20, 2025",
       "June 1, 2025",
@@ -1058,7 +1058,7 @@ export const events: ChurchEvent[] = [
   {
     status: "past",
     title: "Thanksgiving Anniversary",
-    date: "September 20, 2025",
+    date: "September 21, 2025",
     location: "KCCF Mount Zion, Ikotun, Lagos",
     description: "The church gave thanks together for another year of ministry, worship, and community.",
   },
