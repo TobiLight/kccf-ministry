@@ -21,9 +21,6 @@ export function SermonPlayer({ sermon, className = "" }: SermonPlayerProps) {
     />
   ) : null;
 
-  // The control is omitted rather than rendered with an empty id: a click that
-  // assigned a blank signal would hide the facade and request a dead embed URL
-  // with no way back. Task 6 can still set $sermon.videoId from an archive row.
   const control = sermon.youtubeId ? (
     <button
       type="button"
