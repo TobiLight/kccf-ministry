@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "../src/index";
+import { resolveSermons } from "../src/content/sermon-feed";
+import snapshot from "../src/content/sermons.generated.json";
+import { sermons } from "../src/content/sermons";
 import { site } from "../src/content/site";
 import { canonicalAddress } from "./content.test";
 
@@ -179,6 +182,69 @@ describe("sermons page", () => {
 
     expect(html).toContain("https://www.youtube.com/watch?v=");
     expect(html).toContain(">Watch on YouTube</span>");
+  });
+
+  test("groups the archive by year and labels every row's source", async () => {
+    const { html } = await getPage("/sermons");
+
+    expect(html).toContain('class="sermon-archive"');
+    expect(html).toContain("sermon-archive-year");
+    expect(html).toContain("sermon-row-badge");
+    expect(html).toMatch(/<time\b[^>]*datetime="\d{4}-\d{2}-\d{2}"/);
+  });
+
+  test("gives every YouTube archive row a play control and a no-javascript link", async () => {
+    const { html } = await getPage("/sermons");
+    const rows = [...html.matchAll(/<article class="sermon-row[\s\S]*?<\/article>/g)].map((match) => match[0]);
+    const youtubeRows = rows.filter((row) => row.includes("watch?v="));
+
+    expect(youtubeRows.length).toBeGreaterThan(0);
+
+    for (const row of youtubeRows) {
+      expect(row).toMatch(/class="sermon-row-play"/);
+      expect(row).toContain("https://www.youtube.com/watch?v=");
+      expect(row).not.toContain("youtube.com/embed/");
+    }
+  });
+
+  test("drives the featured player from a row and names that control for assistive technology", async () => {
+    const { html } = await getPage("/sermons");
+    const control = html.match(/<button[^>]*class="sermon-row-play"[^>]*>[\s\S]*?<\/button>/)?.[0];
+    const click = control?.match(/data-on:click="([^"]+)"/)?.[1];
+    const videoId = control?.match(/\$sermon\.videoId = &#39;([^&#]+)&#39;/)?.[1];
+    const label = control?.match(/aria-label="([^"]+)"/)?.[1];
+
+    expect(control).toBeDefined();
+    expect(click).toMatch(
+      /^\$sermon\.videoId = &#39;[^&#]+&#39;; document\.getElementById\(&#39;sermon-player&#39;\)\?\.focus\(\)$/,
+    );
+    expect(videoId).toBeDefined();
+    expect(videoId).not.toBe("");
+    expect(label?.startsWith("Play ")).toBe(true);
+    expect(label).toContain("Play");
+    expect(control).toContain('type="button"');
+    expect(control).toContain(">Play</span>");
+  });
+
+  test("flags a curation row only for the archive entries that still need curating", async () => {
+    const { html } = await getPage("/sermons");
+    const rows = [...html.matchAll(/<article class="sermon-row[\s\S]*?<\/article>/g)].map((match) => match[0]);
+    const archive = resolveSermons(sermons, snapshot).filter((sermon) => sermon.youtubeId || sermon.facebookUrl);
+    const flagged = new Set(
+      archive.filter((sermon) => sermon.needsCuration).map((sermon) => sermon.youtubeId),
+    );
+    const settled = archive.filter((sermon) => !sermon.needsCuration);
+
+    expect(rows).toHaveLength(archive.length);
+    expect(flagged.size).toBeGreaterThan(0);
+    expect(settled.length).toBeGreaterThan(0);
+
+    for (const row of rows) {
+      const youtubeId = row.match(/watch\?v=([^"&]+)"/)?.[1];
+
+      expect(youtubeId).toBeDefined();
+      expect(row.includes("sermon-row-flag")).toBe(flagged.has(youtubeId ?? ""));
+    }
   });
 });
 

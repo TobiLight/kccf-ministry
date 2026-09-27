@@ -1788,6 +1788,100 @@ section {
     padding-block: 2rem;
   }
 }
+.sermon-archive {
+  display: grid;
+  gap: 2.5rem;
+}
+.sermon-archive-year {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.sermon-archive-list {
+  margin-top: 1rem;
+}
+.sermon-row {
+  display: grid;
+  gap: 0.8rem;
+  padding-block: 1.1rem;
+  border-bottom: 1px solid color-mix(in srgb, hsl(35 25% 85%) 55%, transparent);
+  @supports (color: color-mix(in lab, red, red)) {
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+  }
+}
+.sermon-row-main {
+  display: grid;
+  gap: 0.25rem;
+}
+.sermon-row-date {
+  color: var(--color-primary-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.sermon-row-title {
+  font-size: 1.15rem;
+}
+.sermon-row-speaker {
+  color: var(--color-muted-foreground);
+  font-size: 0.9rem;
+}
+.sermon-row-aside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.sermon-row-badge, .sermon-row-flag {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.sermon-row-badge {
+  background: color-mix(in srgb, hsl(43 72% 47%) 22%, transparent);
+  @supports (color: color-mix(in lab, red, red)) {
+    background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  }
+  color: var(--color-primary-strong);
+}
+.sermon-row-flag {
+  border: 1px dashed color-mix(in srgb, hsl(25 15% 45%) 45%, transparent);
+  @supports (color: color-mix(in lab, red, red)) {
+    border: 1px dashed color-mix(in srgb, var(--color-muted-foreground) 45%, transparent);
+  }
+  color: var(--color-muted-foreground);
+}
+.sermon-row-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-warm-black);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.sermon-row-play:focus-visible {
+  outline: 0.2rem solid var(--color-primary-strong);
+  outline-offset: 0.2rem;
+}
+.sermon-row-link {
+  font-size: 0.85rem;
+}
+@media (min-width: 48rem) {
+  .sermon-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1.5rem;
+  }
+}
 @property --tw-rotate-x {
   syntax: "*";
   inherits: false;
