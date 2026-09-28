@@ -39,7 +39,7 @@ export function LeadershipPage() {
                     />
                   </div>
                   <div class="pastoral-card-content">
-                    <p class="eyebrow">{leader.role}</p>
+                    <p class="eyebrow text-primary!">{leader.role}</p>
                     <h3>{leader.name}</h3>
                     <blockquote>{leader.verse}</blockquote>
                     <p>{leader.bio}</p>
@@ -70,7 +70,7 @@ export function LeadershipPage() {
                   loading="lazy"
                 />
                 <div class="leadership-card-content">
-                  <p class="eyebrow">{leader.role}</p>
+                  <p class="eyebrow text-primary!">{leader.role}</p>
                   <h3>{leader.name}</h3>
                   <p>{leader.bio}</p>
                 </div>
@@ -83,7 +83,7 @@ export function LeadershipPage() {
       <section class="simple-cta-section">
         <div class="container simple-cta">
           <div>
-            <p class="eyebrow">Connect with us</p>
+            <p class="eyebrow text-primary!">Connect with us</p>
             <h2>We would love to hear from you.</h2>
           </div>
           <ButtonLink className="button button-primary" href="/contact" icon="arrow-right">

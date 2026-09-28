@@ -40,7 +40,7 @@ export function MinistriesPage() {
                 />
               </div>
               <div class="ministry-entry-copy">
-                <p class="eyebrow">Ministry {String(index + 1).padStart(2, "0")}</p>
+                <p class="eyebrow text-primary!">Ministry {String(index + 1).padStart(2, "0")}</p>
                 <h2>{ministry.name}</h2>
                 <p class="body-copy">{ministry.description}</p>
                 <p class="ministry-entry-note">A place to participate, grow, and serve with purpose.</p>
@@ -56,7 +56,7 @@ export function MinistriesPage() {
       <section class="simple-cta-section">
         <div class="container simple-cta">
           <div>
-            <p class="eyebrow">Have a question?</p>
+            <p class="eyebrow text-primary!">Have a question?</p>
             <h2>Let’s find the right place for you.</h2>
           </div>
           <ButtonLink className="button button-primary" href="/contact" icon="arrow-right">

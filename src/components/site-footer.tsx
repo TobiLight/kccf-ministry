@@ -9,12 +9,12 @@ export function SiteFooter() {
       <div class="container site-footer-grid">
         <div class="footer-brand-column">
           
-          <a class="brand brand-footer" href="/">
+          <a class="brand-footer" href="/">
             <img
               class="w-35 h-35 rounded-full border-primary border-2 object-contain bg-primary"
               src={site.imageAssets.logo.src}
               alt={site.imageAssets.logo.alt}
-              width={site.imageAssets.logo.width * 2}
+              width={site.imageAssets.logo.width}
               height={site.imageAssets.logo.height}
             />
             <span class="visually-hidden"> home</span>

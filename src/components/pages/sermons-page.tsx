@@ -23,7 +23,7 @@ export function SermonsPage() {
             <Icon name="facebook" size={30} />
           </div>
           <div>
-            <p class="eyebrow">Live from KCCF</p>
+            <p class="eyebrow text-primary!">Live from KCCF</p>
             <h2>Join us live on Facebook</h2>
             <p>Watch the message, worship with us, and stay connected wherever you are.</p>
           </div>

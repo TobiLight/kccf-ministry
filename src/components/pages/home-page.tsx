@@ -176,7 +176,7 @@ export function HomePage() {
             </div>
           ) : (
             <div class="empty-state">
-              <p class="eyebrow">More to come</p>
+              <p class="eyebrow text-primary!">More to come</p>
               <h3>No upcoming events</h3>
               <p>Join us for worship this Sunday and stay connected for what is next.</p>
               <ButtonLink className="text-link" href="/events" icon="arrow-right">

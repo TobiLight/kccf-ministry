@@ -47,7 +47,7 @@ export function ContactPage() {
                   <Icon name="map-pin" size={20} />
                 </span>
                 <div>
-                  <p class="eyebrow">Address</p>
+                  <p class="eyebrow text-primary!">Address</p>
                   <address>{site.contact.address}</address>
                   <ButtonLink className="text-link" href={site.contact.mapsUrl} external icon="external-link">
                     Open in Maps
@@ -59,7 +59,7 @@ export function ContactPage() {
                   <Icon name="phone" size={20} />
                 </span>
                 <div>
-                  <p class="eyebrow">Phone</p>
+                  <p class="eyebrow text-primary!">Phone</p>
                   <a href={`tel:${site.contact.phone}`}>{site.contact.phone}</a>
                 </div>
               </div>
@@ -68,7 +68,7 @@ export function ContactPage() {
                   <Icon name="mail" size={20} />
                 </span>
                 <div>
-                  <p class="eyebrow">Email</p>
+                  <p class="eyebrow text-primary!">Email</p>
                   <a href={`mailto:${site.contact.email}`}>{site.contact.email}</a>
                 </div>
               </div>
@@ -77,7 +77,7 @@ export function ContactPage() {
                   <Icon name="facebook" size={20} />
                 </span>
                 <div>
-                  <p class="eyebrow">Facebook</p>
+                  <p class="eyebrow text-primary!">Facebook</p>
                   <ButtonLink className="text-link" href={site.contact.facebookUrl} external icon="facebook">
                     @kccfministries
                   </ButtonLink>
@@ -86,7 +86,7 @@ export function ContactPage() {
             </div>
           </div>
           <div class="service-summary">
-            <p class="eyebrow">Service times</p>
+            <p class="eyebrow text-primary!">Service times</p>
             <h2>Make a Sunday of it.</h2>
             {site.services.map((service) => (
               <div class="service-summary-row">
@@ -109,7 +109,7 @@ export function ContactPage() {
               description="Explore the form locally, then call or email us using the details above."
             />
             <div class="contact-form-aside">
-              <p class="eyebrow">Prefer to connect?</p>
+              <p class="eyebrow text-primary!">Prefer to connect?</p>
               <p>Call or email us directly using the details above. We would love to hear from you.</p>
             </div>
           </div>
@@ -169,7 +169,7 @@ export function ContactPage() {
       <section class="visit-section" id="visit-us">
         <div class="container visit-cta">
           <div>
-            <p class="eyebrow">Plan Your Visit</p>
+            <p class="eyebrow text-primary!">Plan Your Visit</p>
             <h2>There is a seat for you.</h2>
             <p>Come and experience the warmth of our church family in person.</p>
           </div>

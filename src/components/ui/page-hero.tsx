@@ -18,7 +18,7 @@ export function PageHero({ eyebrow, title, description, image, imageAlt, classNa
     <section class={`page-hero ${className}`.trim()}>
       <div class="page-hero-inner">
         <div class="page-hero-copy animate-fade-up">
-          {eyebrow ? <p class="eyebrow">{eyebrow}</p> : null}
+          {eyebrow ? <p class="eyebrow text-primary!">{eyebrow}</p> : null}
           <h1>{title}</h1>
           <p>{description}</p>
         </div>

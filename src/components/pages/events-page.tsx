@@ -30,7 +30,7 @@ export function EventsPage() {
           <div class="event-service-grid">
             {regularServices.map((service) => (
               <article class="event-service-card">
-                <p class="eyebrow">{service === monthlyService ? "Monthly gathering" : "Weekly service"}</p>
+                <p class="eyebrow text-primary!">{service === monthlyService ? "Monthly gathering" : "Weekly service"}</p>
                 <h3>{service.name}</h3>
                 <p class="event-time">{service.time}</p>
                 <p>Join the KCCF family for a meaningful time of worship and togetherness.</p>
@@ -66,7 +66,7 @@ export function EventsPage() {
                     loading="lazy"
                   />
                   <div class="card-content">
-                    <p class="eyebrow">
+                    <p class="eyebrow text-primary!">
                       {event.date} · {event.time}
                     </p>
                     <h3>{event.title}</h3>
@@ -78,7 +78,7 @@ export function EventsPage() {
             </div>
           ) : (
             <div class="empty-state empty-state-large">
-              <p class="eyebrow">The next chapter</p>
+              <p class="eyebrow text-primary!">The next chapter</p>
               <h3>No upcoming events</h3>
               <p>
                 Our featured events calendar is being prepared. Join us for a regular service in the meantime, or contact

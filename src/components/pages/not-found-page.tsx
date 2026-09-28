@@ -7,7 +7,7 @@ export function NotFoundPage() {
       <section class="not-found-section">
         <div class="container not-found-content">
           <p class="not-found-number">404</p>
-          <p class="eyebrow">A wrong turn</p>
+          <p class="eyebrow text-primary!">A wrong turn</p>
           <h1>Oops! Page not found</h1>
           <p>The page you are looking for may have moved, or the address may be incorrect.</p>
           <ButtonLink className="button button-primary" href="/" icon="arrow-right">
