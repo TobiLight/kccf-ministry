@@ -5,13 +5,12 @@ export type PageHeroProps = {
   title: string;
   description: string;
   image?: string;
-  imageAlt?: string;
   className?: string;
 };
 
-export function PageHero({ eyebrow, title, description, image, imageAlt, className = "" }: PageHeroProps) {
+export function PageHero({ eyebrow, title, description, image, className = "" }: PageHeroProps) {
   const imageAsset = image ? getImageAsset(image) : undefined;
-  const resolvedImageAlt = imageAlt ?? imageAsset?.alt ?? "";
+  const resolvedImageAlt = imageAsset?.alt ?? "";
   const responsiveSource = image ? getResponsiveSourceSet(image) : {};
 
   return (

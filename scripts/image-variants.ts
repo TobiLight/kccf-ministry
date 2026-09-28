@@ -45,9 +45,10 @@ function parseArgs(argv: string[]): Options {
         .map((part) => {
           const trimmed = part.trim();
           if (!/^\d+$/.test(trimmed)) fail(`invalid width: "${part}" — expected a positive integer`);
-          return Number.parseInt(trimmed, 10);
-        })
-        .filter((width) => width > 0);
+          const width = Number.parseInt(trimmed, 10);
+          if (width === 0) fail(`invalid width: "${part}" — expected a positive integer`);
+          return width;
+        });
       continue;
     }
 
@@ -81,7 +82,11 @@ function parseArgs(argv: string[]): Options {
     fail("usage: image-variants <source> <base-name> [--widths 640,1024,1600] [--out static/images] [--src-width N] [--const-name name] [--force]");
   }
 
-  return { source: source!, baseName: baseName!, widths: [...widths].sort((a, b) => a - b), outDir, srcWidth, force, constName };
+  // A repeated width would emit a duplicate descriptor, which a pasted srcset
+  // must never contain, so drop repeats before anything is generated.
+  const uniqueWidths = [...new Set(widths)].sort((a, b) => a - b);
+
+  return { source: source!, baseName: baseName!, widths: uniqueWidths, outDir, srcWidth, force, constName };
 }
 
 async function run(command: string[]): Promise<string> {
@@ -190,9 +195,15 @@ if (!servable) {
 
 console.log("");
 console.log(`// paste into imageAssetMap in src/content/site.ts`);
+// Ascending by descriptor, matching the committed ladders and the
+// ascending-order contract the asset tests enforce on every srcset.
+const candidates = [
+  { file: srcFile, width: finalSrcSize.width },
+  ...generated,
+].sort((a, b) => a.width - b.width);
+
 console.log(`const ${identifier} = [`);
-console.log(`  "${publicPath(srcFile)} ${finalSrcSize.width}w",`);
-for (const entry of generated) {
+for (const entry of candidates) {
   console.log(`  "${publicPath(entry.file)} ${entry.width}w",`);
 }
 console.log(`].join(", ");`);

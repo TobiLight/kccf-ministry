@@ -61,7 +61,7 @@ export const events: ChurchEvent[] = [
     status: "upcoming",
     title: "Carol Service",
     location: "KCCF Mount Zion, Ikotun, Lagos",
-    description: "A carol service to welcome the Christmas season. Date to be announced.",
+    description: "A carol service to welcome the Christmas season.",
   },
   {
     status: "upcoming",

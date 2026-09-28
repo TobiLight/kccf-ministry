@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "../src/index";
+import { events, pastEvents, upcomingEvents } from "../src/content/events";
 import { site } from "../src/content/site";
 import { canonicalAddress } from "./content.test";
+
+const renderedPastTitles = pastEvents.map((event) => event.title.replace(/'/g, "&#39;"));
 
 async function getPage(path: string) {
   const response = await createApp().request(path);
@@ -56,9 +59,11 @@ describe("home page", () => {
 
     expect(html).toContain("Upcoming Events");
     expect(html).toContain("Carol Service");
-    expect(html).not.toContain("Annual Church Thanksgiving Anniversary");
-    expect(html).not.toContain("Children&#39;s Anniversary");
     expect(html).not.toContain("Past Events");
+    // No past event may reach the teaser, whichever one is swapped in.
+    for (const title of renderedPastTitles) {
+      expect(html).not.toContain(title);
+    }
     // The fourth upcoming event is the ceiling: it must not reach the teaser.
     expect(html).not.toContain("Christmas Service");
     expect((html.match(/class="card event-card"/g) ?? [])).toHaveLength(3);
@@ -150,12 +155,20 @@ describe("events page", () => {
       "Women&#39;s Anniversary",
       "Christmas Service",
       "Past Events",
-      "Annual Church Thanksgiving Anniversary",
-      "Children&#39;s Anniversary",
     ]);
     expect(html).toContain("Every 1st Thursday Transformation Night");
     expect(html).toContain("10:00 PM");
     expect(html).not.toContain("Weekly gathering");
+  });
+
+  test("renders every past event only after the past section boundary", async () => {
+    const { html } = await getPage("/events");
+    const boundary = html.indexOf('id="past-events-title"');
+
+    expect(boundary).toBeGreaterThan(-1);
+    for (const title of renderedPastTitles) {
+      expect(html.indexOf(title)).toBeGreaterThan(boundary);
+    }
   });
 
   test("labels unannounced dates as a standalone eyebrow and never renders a dangling separator", async () => {
@@ -167,6 +180,9 @@ describe("events page", () => {
     // A schedule label is its own paragraph, so the `</p>` must close it directly.
     // A bare substring is not enough: "Date to be announced" also occurs in body copy.
     expect(html).toContain('<p class="eyebrow">Date to be announced</p>');
+    // Catches any direct date or time interpolation that skips formatEventSchedule,
+    // which is how a date-only event would render a literal "undefined" separator.
+    expect(main).not.toContain("undefined");
   });
 
   test("renders event cards through the shared Card component", async () => {

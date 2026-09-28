@@ -111,6 +111,14 @@ describe("site content", () => {
     expect(new Set(titles).size).toBe(titles.length);
   });
 
+  test("gives no event a photograph, gallery, or slug", () => {
+    for (const event of events) {
+      for (const key of ["image", "images", "photos", "slug"]) {
+        expect(Object.keys(event)).not.toContain(key);
+      }
+    }
+  });
+
   test("orders past events newest first as authored", () => {
     const dates = pastEvents.map((event) => event.date);
     expect(dates).toEqual([
