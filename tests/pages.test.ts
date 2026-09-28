@@ -51,14 +51,18 @@ describe("home page", () => {
     expect(html).toContain("href=\"/sermons\"");
   });
 
-  test("shows only upcoming events in the home teaser", async () => {
-    const { html } = await getPage("/");
+  test("shows only upcoming events in the home teaser, capped at three", async () => {
+    const { html, main } = await getPage("/");
 
     expect(html).toContain("Upcoming Events");
     expect(html).toContain("Carol Service");
     expect(html).not.toContain("Annual Church Thanksgiving Anniversary");
     expect(html).not.toContain("Children&#39;s Anniversary");
     expect(html).not.toContain("Past Events");
+    // The fourth upcoming event is the ceiling: it must not reach the teaser.
+    expect(html).not.toContain("Christmas Service");
+    expect((html.match(/class="card event-card"/g) ?? [])).toHaveLength(3);
+    expect(main).not.toMatch(/·\s*<\/p>/);
   });
 });
 
@@ -154,11 +158,15 @@ describe("events page", () => {
     expect(html).not.toContain("Weekly gathering");
   });
 
-  test("labels unannounced dates instead of rendering an empty schedule", async () => {
-    const { html } = await getPage("/events");
+  test("labels unannounced dates as a standalone eyebrow and never renders a dangling separator", async () => {
+    const { html, main } = await getPage("/events");
 
-    expect(html).toContain("Date to be announced");
-    expect(html).not.toContain("undefined");
+    // Catches `{event.date} · {event.time}`, which JSX renders as a bare or trailing "·".
+    // Checked first: this failure is compact, the next one dumps the whole document.
+    expect(main).not.toMatch(/·\s*<\/p>/);
+    // A schedule label is its own paragraph, so the `</p>` must close it directly.
+    // A bare substring is not enough: "Date to be announced" also occurs in body copy.
+    expect(html).toContain('<p class="eyebrow">Date to be announced</p>');
   });
 
   test("renders event cards through the shared Card component", async () => {
@@ -174,6 +182,14 @@ describe("events page", () => {
 
     expect(html).toContain('aria-labelledby="past-events-title"');
     expect(html).toContain('id="past-events-title"');
+  });
+
+  test("renders a location on every event card and a recap only where one is authored", async () => {
+    const { html } = await getPage("/events");
+
+    expect((html.match(/<p class="event-location">/g) ?? [])).toHaveLength(9);
+    expect((html.match(/<p class="event-recap">/g) ?? [])).toHaveLength(1);
+    expect(html).toContain('<p class="event-recap">The service carried the theme Harvest of Abundance.</p>');
   });
 });
 
