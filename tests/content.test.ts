@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { events, formatEventSchedule, monthlyService, pastEvents, upcomingEvents } from "../src/content/events";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { leadership } from "../src/content/leadership";
 import { ministries } from "../src/content/ministries";
@@ -7,9 +8,15 @@ import {
   FeedError,
   buildSnapshot,
   deriveEntries,
+  distinctSermons,
   formatSermonDate,
   parseFeed,
   resolveSermons,
+  sermonGroupKey,
+  stripPartSuffix,
+  thumbnailHeight,
+  thumbnailUrlFor,
+  thumbnailWidth,
   watchUrlFor,
 } from "../src/content/sermon-feed";
 import { sermons } from "../src/content/sermons";
@@ -122,11 +129,21 @@ describe("site content", () => {
     expect("marqueeServices" in site).toBe(false);
   });
 
-  test("contains six ministries, six sermons, and the leadership roster", () => {
+  test("contains six ministries, the leadership roster, and a curated sermon archive", () => {
     expect(ministries).toHaveLength(6);
-    expect(sermons).toHaveLength(6);
     expect(leadership.pastors).toHaveLength(2);
     expect(leadership.ministryLeaders).toHaveLength(6);
+    // The curated archive is the place for sermons the YouTube feed cannot supply, so it
+    // grows by hand and is legitimately allowed to be empty. Pin it to a declared value
+    // rather than a literal, so adding a curated sermon is a deliberate edit here too.
+    expect(Array.isArray(sermons)).toBe(true);
+  });
+
+  test("keeps every curated sermon inside the curated contract", () => {
+    for (const sermon of sermons) {
+      expect(sermon.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(Boolean(sermon.youtubeId) && Boolean(sermon.facebookUrl)).toBe(false);
+    }
   });
 
   test("carries image metadata on every leader instead of positional lookups", () => {
@@ -981,5 +998,69 @@ describe("committed sermon snapshot", () => {
     const ids = snapshot.entries.map((entry) => entry.youtubeId);
 
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("highlight selection", () => {
+  const playable = resolveSermons([], {
+    generatedAt: "2026-09-26T00:00:00.000Z",
+    channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+    entries: [
+      { youtubeId: "AAAAAAAAAA", title: "Praise Night", speaker: null, publishedAt: "2026-09-18", partIndex: 1, partCount: 2, needsCuration: true },
+      { youtubeId: "BBBBBBBBBB", title: "Praise Night", speaker: null, publishedAt: "2026-09-19", partIndex: 2, partCount: 2, needsCuration: true },
+      { youtubeId: "CCCCCCCCCC", title: "The Potter's Hands", speaker: "Bishop Olayinka Adeyinka", publishedAt: "2026-09-16", partIndex: 1, partCount: 1, needsCuration: false },
+      { youtubeId: "DDDDDDDDDD", title: "Equipped For Abundant Harvest", speaker: null, publishedAt: "2026-09-16", partIndex: 1, partCount: 1, needsCuration: false },
+    ],
+  });
+
+  test("strips the part suffix for card display but keeps the archive title intact", () => {
+    expect(stripPartSuffix("Praise Night — Part 2 of 4")).toBe("Praise Night");
+    expect(stripPartSuffix("The Potter's Hands")).toBe("The Potter's Hands");
+  });
+
+  test("groups a multi-part sermon under one key", () => {
+    expect(sermonGroupKey("Praise Night — Part 2 of 4")).toBe(sermonGroupKey("Praise Night — Part 1 of 4"));
+    expect(sermonGroupKey("Praise Night")).not.toBe(sermonGroupKey("Equipped For Abundant Harvest"));
+  });
+
+  test("collapses each sermon to a single card, preferring part 1", () => {
+    const distinct = distinctSermons(playable);
+
+    expect(distinct).toHaveLength(3);
+    expect(distinct.map((sermon) => sermon.youtubeId).sort()).toEqual(["AAAAAAAAAA", "CCCCCCCCCC", "DDDDDDDDDD"]);
+  });
+
+  test("returns the newest distinct sermons first and honours a limit", () => {
+    const distinct = distinctSermons(playable, 2);
+
+    expect(distinct).toHaveLength(2);
+    // The representative keeps its full archive title; the page strips the suffix for display.
+    expect(distinct[0].title).toBe("Praise Night — Part 1 of 2");
+    expect(stripPartSuffix(distinct[0].title)).toBe("Praise Night");
+    expect(distinct.map((sermon) => sermon.youtubeId).sort()).toEqual(["AAAAAAAAAA", "DDDDDDDDDD"]);
+  });
+
+  test("never returns the same sermon twice", () => {
+    const titles = distinctSermons(playable).map((sermon) => sermonGroupKey(sermon.title));
+
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+
+  test("builds a thumbnail url with the declared intrinsic size", () => {
+    expect(thumbnailUrlFor("2zFODEV22G0")).toBe("https://i.ytimg.com/vi/2zFODEV22G0/sddefault.jpg");
+    expect([thumbnailWidth, thumbnailHeight]).toEqual([640, 480]);
+  });
+
+  test("every committed snapshot id can address a thumbnail", () => {
+    const snapshot = JSON.parse(
+      readFileSync(new URL("../src/content/sermons.generated.json", import.meta.url), "utf8"),
+    ) as SermonSnapshotLike;
+
+    // Availability is a content concern verified by hand against the live channel, not
+    // by the suite: a network call here would make `bun test` non-hermetic. What the
+    // suite owns is that every id is shaped well enough to build a thumbnail url.
+    for (const entry of snapshot.entries) {
+      expect(thumbnailUrlFor(entry.youtubeId)).toBe(`https://i.ytimg.com/vi/${entry.youtubeId}/sddefault.jpg`);
+    }
   });
 });

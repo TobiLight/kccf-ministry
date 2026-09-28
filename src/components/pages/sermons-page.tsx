@@ -5,16 +5,51 @@ import { PageHero } from "../ui/page-hero";
 import { SectionHeading } from "../ui/section-heading";
 import { SermonArchive } from "../ui/sermon-archive";
 import { SermonPlayer } from "../ui/sermon-player";
-import { formatSermonDate, resolveSermons } from "../../content/sermon-feed";
+import {
+  distinctSermons,
+  formatSermonDate,
+  resolveSermons,
+  stripPartSuffix,
+  thumbnailHeight,
+  thumbnailUrlFor,
+  thumbnailWidth,
+  watchUrlFor,
+} from "../../content/sermon-feed";
 import snapshot from "../../content/sermons.generated.json";
 import { sermons } from "../../content/sermons";
 import { site } from "../../content/site";
+import type { Sermon } from "../../content/types";
+
+const highlightLimit = 6;
+
+function highlightActions(sermon: Sermon) {
+  if (!sermon.youtubeId) {
+    return null;
+  }
+
+  return (
+    <div class="sermon-card-actions">
+      <button
+        type="button"
+        class="sermon-row-play"
+        data-on:click={`$sermon.videoId = ${JSON.stringify(sermon.youtubeId)}; document.getElementById('sermon-player')?.focus()`}
+        aria-label={`Play message: ${stripPartSuffix(sermon.title)}`}
+      >
+        <Icon name="play" size={18} />
+        <span>Play</span>
+      </button>
+      <a class="sermon-row-link" href={watchUrlFor(sermon.youtubeId)} target="_blank" rel="noopener noreferrer">
+        Watch on YouTube
+      </a>
+    </div>
+  );
+}
 
 export function SermonsPage() {
   const all = resolveSermons(sermons, snapshot);
   const playable = all.filter((sermon) => sermon.youtubeId);
   const [featured] = playable;
-  const highlights = sermons.filter((sermon) => sermon.image);
+  const highlights = distinctSermons(playable, highlightLimit);
   const archive = all.filter((sermon) => sermon.youtubeId || sermon.facebookUrl);
 
   return (
@@ -75,11 +110,14 @@ export function SermonsPage() {
               {highlights.map((sermon) => (
                 <Card
                   className="sermon-card"
-                  image={sermon.image}
-                  title={sermon.title}
+                  image={sermon.youtubeId ? thumbnailUrlFor(sermon.youtubeId) : undefined}
+                  imageWidth={thumbnailWidth}
+                  imageHeight={thumbnailHeight}
+                  imageAlt=""
+                  title={stripPartSuffix(sermon.title)}
                   description={[sermon.speaker, formatSermonDate(sermon.date)].filter(Boolean).join(" · ")}
                 >
-                  <p>{sermon.summary}</p>
+                  {highlightActions(sermon)}
                 </Card>
               ))}
             </div>

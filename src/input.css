@@ -1967,3 +1967,11 @@ section {
     gap: 1.5rem;
   }
 }
+
+.sermon-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}

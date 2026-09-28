@@ -278,3 +278,50 @@ export function formatSermonDate(iso: string): string {
 export function watchUrlFor(youtubeId: string): string {
   return `https://www.youtube.com/watch?v=${youtubeId}`;
 }
+
+const partSuffix = /\s+—\s+Part \d+ of \d+$/;
+
+export function stripPartSuffix(title: string): string {
+  return title.replace(partSuffix, "");
+}
+
+export function sermonGroupKey(title: string): string {
+  return normaliseGroupKey(stripPartSuffix(title));
+}
+
+export function thumbnailUrlFor(youtubeId: string): string {
+  return `https://i.ytimg.com/vi/${youtubeId}/sddefault.jpg`;
+}
+
+export const thumbnailWidth = 640;
+export const thumbnailHeight = 480;
+
+export function distinctSermons(sermons: Sermon[], limit = Number.POSITIVE_INFINITY): Sermon[] {
+  const best = new Map<string, Sermon>();
+
+  for (const sermon of sermons) {
+    const key = sermonGroupKey(sermon.title);
+    const held = best.get(key);
+
+    if (held === undefined || isBetterRepresentative(sermon, held)) {
+      best.set(key, sermon);
+    }
+  }
+
+  const ordered = [...best.values()].sort(
+    (a, b) => b.date.localeCompare(a.date) || (a.partIndex ?? 0) - (b.partIndex ?? 0) || a.title.localeCompare(b.title),
+  );
+
+  return ordered.slice(0, limit);
+}
+
+function isBetterRepresentative(candidate: Sermon, held: Sermon): boolean {
+  const candidatePart = candidate.partIndex ?? 0;
+  const heldPart = held.partIndex ?? 0;
+
+  if (candidatePart !== heldPart) {
+    return candidatePart < heldPart;
+  }
+
+  return candidate.date > held.date;
+}

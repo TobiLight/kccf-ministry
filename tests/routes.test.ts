@@ -134,7 +134,7 @@ describe("security headers", () => {
     expect(directives["script-src-attr"]).toEqual(["'none'"]);
     expect(directives["style-src"]).toEqual(["'self'", "https://fonts.googleapis.com"]);
     expect(directives["font-src"]).toEqual(["'self'", "https://fonts.gstatic.com"]);
-    expect(directives["img-src"]).toEqual(["'self'", "data:"]);
+    expect(directives["img-src"]).toEqual(["'self'", "data:", "https://i.ytimg.com"]);
     expect(directives["object-src"]).toEqual(["'none'"]);
     expect(directives["base-uri"]).toEqual(["'self'"]);
     expect(directives["form-action"]).toEqual(["'self'"]);
@@ -175,7 +175,30 @@ describe("security headers", () => {
 
     expect(policy).not.toContain("https://www.youtube.com");
     expect(policy).not.toContain("https://connect.facebook.net");
-    expect(directives["img-src"]).toEqual(["'self'", "data:"]);
+    expect(directives["img-src"]).toEqual(["'self'", "data:", "https://i.ytimg.com"]);
+    expect(directives["connect-src"]).toEqual(["'self'"]);
+  });
+
+  test("confines the YouTube thumbnail host to img-src and nothing else", async () => {
+    const response = await createApp().request("/sermons");
+    const policy = response.headers.get("content-security-policy") ?? "";
+    const directives = parsePolicy(policy);
+    const host = "https://i.ytimg.com";
+
+    expect(directives["img-src"]).toContain(host);
+
+    for (const [name, values] of Object.entries(directives)) {
+      if (name === "img-src") {
+        continue;
+      }
+
+      expect(values, `${name} must not allow the thumbnail host`).not.toContain(host);
+    }
+
+    // Thumbnails are images only. The thumbnail host must never be able to supply a
+    // script, a frame, or an XHR target.
+    expect(directives["script-src"]).not.toContain(host);
+    expect(directives["frame-src"]).not.toContain(host);
     expect(directives["connect-src"]).toEqual(["'self'"]);
   });
 

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "../src/index";
 import { events, pastEvents, upcomingEvents } from "../src/content/events";
-import { resolveSermons } from "../src/content/sermon-feed";
+import { distinctSermons, resolveSermons, stripPartSuffix, thumbnailHeight, thumbnailWidth } from "../src/content/sermon-feed";
 import snapshot from "../src/content/sermons.generated.json";
 import { sermons } from "../src/content/sermons";
 import { site } from "../src/content/site";
@@ -116,15 +116,58 @@ describe("ministries page", () => {
 });
 
 describe("sermons page", () => {
-  test("renders the live banner and the curated message cards", async () => {
+  test("renders the live banner and a row of dynamic highlight cards", async () => {
     const { html, main } = await getPage("/sermons");
 
-    expectInOrder(main, ["Sermons", "Join us live on Facebook", "The God Who Meets Us", "The Freedom to Serve", "View More on Facebook"]);
-    expect(html.match(/class="card sermon-card"/g) ?? []).toHaveLength(
-      sermons.filter((sermon) => sermon.image).length,
-    );
+    expectInOrder(main, ["Sermons", "Join us live on Facebook", "Watch the Latest", "A Word for the Journey", "Every Recorded Message", "View More on Facebook"]);
     expect(html).not.toContain("<video");
     expect(html).toContain("https://www.facebook.com/kccfministries");
+  });
+
+  test("builds every highlight card from a real recorded message, one per sermon", async () => {
+    const { html } = await getPage("/sermons");
+    const cards = [...html.matchAll(/<article class="card sermon-card">([\s\S]*?)<\/article>/g)].map((m) => m[1]);
+
+    expect(cards.length).toBeGreaterThan(0);
+
+    const expected = distinctSermons(resolveSermons(sermons, snapshot).filter((sermon) => sermon.youtubeId), 6);
+
+    expect(cards).toHaveLength(expected.length);
+
+    for (const [index, card] of cards.entries()) {
+      const sermon = expected[index];
+
+      // Real YouTube artwork, not the local asset library.
+      expect(card).toContain(`src="https://i.ytimg.com/vi/${sermon.youtubeId}/sddefault.jpg"`);
+      expect(card).toContain(`width="${thumbnailWidth}"`);
+      expect(card).toContain(`height="${thumbnailHeight}"`);
+      // The card title drops the part suffix so a multi-part sermon is not repeated.
+      // Hono escapes apostrophes, so escape the expectation the same way.
+      const renderedTitle = stripPartSuffix(sermon.title).replace(/'/g, "&#39;");
+
+      expect(card).toContain(`<h3>${renderedTitle}</h3>`);
+    }
+  });
+
+  test("never shows the same sermon twice across the highlight row", async () => {
+    const { html } = await getPage("/sermons");
+    const titles = [...html.matchAll(/<article class="card sermon-card">[\s\S]*?<h3>([^<]+)<\/h3>/g)].map((m) => m[1]);
+
+    expect(titles.length).toBeGreaterThan(0);
+
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+
+  test("gives every highlight card a play control and a no-javascript link", async () => {
+    const { html } = await getPage("/sermons");
+    const cards = [...html.matchAll(/<article class="card sermon-card">([\s\S]*?)<\/article>/g)].map((m) => m[1]);
+
+    for (const card of cards) {
+      expect(card).toMatch(/class="sermon-row-play"/);
+      expect(card).toContain("youtube.com/watch?v=");
+      // A card links out to YouTube; it never embeds the cookied host.
+      expect(card).not.toContain("youtube.com/embed/");
+    }
   });
 
   test("uses the Facebook icon instead of a literal glyph and drops the filler archive note", async () => {
@@ -305,17 +348,6 @@ describe("sermons page", () => {
     expect(featuredTitle).toBe(firstRowTitle);
   });
 
-  test("keeps the existing highlight cards limited to curated artwork", async () => {
-    const { html } = await getPage("/sermons");
-    const cards = [...html.matchAll(/<article class="card sermon-card">([\s\S]*?)<\/article>/g)].map((m) => m[1]);
-
-    expect(cards).toHaveLength(sermons.filter((sermon) => sermon.image).length);
-    expect(cards.length).toBeGreaterThan(0);
-
-    for (const card of cards) {
-      expect(card).toContain("card-image");
-    }
-  });
 });
 
 describe("events page", () => {

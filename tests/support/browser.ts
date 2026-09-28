@@ -252,13 +252,22 @@ export async function startBrowser(fetchHandler: (request: Request) => Response 
         () => undefined,
       ),
     open: async (path: string) => {
-      const loaded = client.waitFor("Page.loadEventFired");
+      // Wait for the DOM, not for `load`. Every test in this suite asserts on DOM state,
+      // and `load` also waits on third-party subresources — the YouTube thumbnail CDN on
+      // /sermons, the Google Fonts stylesheet on every page. A slow CDN would otherwise
+      // hang the suite on a timeout rather than fail an assertion. Module scripts run
+      // before DOMContentLoaded, so Datastar is already active by then. Raced against
+      // `load` so the harness still works if a Chrome build withholds the earlier event.
+      const ready = Promise.race([
+        client.waitFor("Page.domContentLoadedEventFired"),
+        client.waitFor("Page.loadEventFired"),
+      ]);
       problems.length = 0;
       requests.length = 0;
       statuses.clear();
       urlsByRequestId.clear();
       await client.send("Page.navigate", { url: `${origin}${path}` }, sessionId);
-      await loaded;
+      await ready;
       await Bun.sleep(250);
     },
     evaluate,

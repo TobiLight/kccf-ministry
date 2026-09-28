@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "../src/index";
 import { getImageAsset, imageAssets } from "../src/content/site";
+import { thumbnailHeight, thumbnailWidth } from "../src/content/sermon-feed";
 
 async function getPage(path: string) {
   const response = await createApp().request(path);
@@ -229,8 +230,8 @@ describe("rendered accessibility contract", () => {
   });
 
   test("public images use intrinsic dimensions, responsive sources, and correct about alt text", async () => {
-    const dimensions = new Map(
-      Object.values(imageAssets).map((asset) => [asset.src, [asset.width, asset.height]] as const),
+    const dimensions = new Map<string, readonly [number, number]>(
+      Object.values(imageAssets).map((asset) => [asset.src, [asset.width, asset.height] as const]),
     );
     const srcsets = new Map(
       Object.values(imageAssets)
@@ -244,8 +245,14 @@ describe("rendered accessibility contract", () => {
       const images = [...html.matchAll(/<img\b[^>]*>/g)].map((match) => match[0]);
       for (const image of images) {
         const src = image.match(/src="([^"]+)"/)?.[1];
-        const size = src ? dimensions.get(src) : undefined;
-        expect(size).toBeDefined();
+        // Sermon artwork is a YouTube thumbnail, not a local asset, so its intrinsic
+        // size comes from the same constants the page renders it with. The contract is
+        // still "every image declares its real dimensions", it is just not file-backed.
+        const size = src
+          ? dimensions.get(src) ??
+            (src.startsWith("https://i.ytimg.com/vi/") ? ([thumbnailWidth, thumbnailHeight] as const) : undefined)
+          : undefined;
+        expect(size, `no declared dimensions for ${src}`).toBeDefined();
         expect(image).toContain(`width="${size?.[0]}"`);
         expect(image).toContain(`height="${size?.[1]}"`);
         if (image.includes('class="card-image"')) {

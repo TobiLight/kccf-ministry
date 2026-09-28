@@ -258,7 +258,9 @@ describe.skipIf(!chromePath)("real browser smoke", () => {
 
         const loadedTitle = embed?.getAttribute("title") ?? "";
         const facadeLabel = document.querySelector(".sermon-facade-play").getAttribute("aria-label");
-        const rows = [...document.querySelectorAll(".sermon-row-play")];
+        // Scoped to the archive on purpose: the highlight cards reuse this control's
+        // styling, and the archive is what this test is proving can drive the player.
+        const rows = [...document.querySelectorAll(".sermon-archive .sermon-row-play")];
         const target = rows.find((row) => {
           const rowTitle = row.closest(".sermon-row").querySelector(".sermon-row-title").textContent.trim();
           return row.getAttribute("aria-label") !== facadeLabel && rowTitle !== loadedTitle;
