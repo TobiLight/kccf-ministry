@@ -17,7 +17,6 @@ export function SiteFooter() {
               width={site.imageAssets.logo.width}
               height={site.imageAssets.logo.height}
             />
-            <span class="visually-hidden"> home</span>
           </a>
           <p>{site.description}</p>
           <div class="social-links">

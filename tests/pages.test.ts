@@ -389,7 +389,9 @@ describe("events page", () => {
     expect(main).not.toMatch(/·\s*<\/p>/);
     // A schedule label is its own paragraph, so the `</p>` must close it directly.
     // A bare substring is not enough: "Date to be announced" also occurs in body copy.
-    expect(html).toContain('<p class="eyebrow">Date to be announced</p>');
+    // The class is matched loosely on purpose: the shared Card paints its eyebrow with
+    // `text-primary!`, and the contract here is the paragraph and the label, not the colour.
+    expect(html).toMatch(/<p class="eyebrow[^"]*">Date to be announced<\/p>/);
     // Catches any direct date or time interpolation that skips formatEventSchedule,
     // which is how a date-only event would render a literal "undefined" separator.
     expect(main).not.toContain("undefined");

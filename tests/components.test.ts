@@ -189,7 +189,10 @@ describe("shared page components", () => {
     expect(html).not.toContain('aria-label="Skip to main content"');
     expect(html).toContain('<a class="brand-lockup" href="/">');
     expect(html).toContain('<img class="brand-logo-image"');
-    expect(html).toContain('<span class="visually-hidden"> home</span>');
+    // The lockup is the logo alone, so the link's accessible name is the image's alt text.
+    // A visually hidden text span here would name the link twice.
+    expect(html).toContain('alt="KCCF Ministries"');
+    expect(html).not.toContain('<span class="visually-hidden"> home</span>');
     expect(html).not.toContain('name="menu"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('data-attr:aria-expanded="$menuOpen ? &#39;true&#39; : &#39;false&#39;"');

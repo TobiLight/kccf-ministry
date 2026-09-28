@@ -206,6 +206,13 @@ describe.skipIf(!chromePath)("real browser smoke", () => {
         const accessibleName = (element) => {
           const clone = element.cloneNode(true);
           clone.querySelectorAll('[aria-hidden="true"]').forEach((hidden) => hidden.remove());
+          // The real accname algorithm takes an image's alt text into account. Without that,
+          // any link whose only content is the logo would measure as unnamed, and the suite
+          // would "need" a visually hidden text span purely to satisfy its own helper.
+          clone.querySelectorAll("img").forEach((image) => {
+            if (!image.getAttribute("alt")) image.remove();
+            else image.replaceWith(document.createTextNode(" " + image.getAttribute("alt") + " "));
+          });
           return clone.textContent.replace(/\\s+/g, " ").trim();
         };
         const logo = document.querySelector(".brand-lockup");
@@ -223,12 +230,13 @@ describe.skipIf(!chromePath)("real browser smoke", () => {
     `);
 
     expect(branding.favicon).toBe("/static/favicon.svg");
-    expect(branding.brandName).toBe("KCCF Ministries home");
-    expect(branding.brandName.toLowerCase()).toContain("kccf ministries");
+    // The header brands with the circular logo alone, so the link is named by the image's
+    // alt text. The footer uses the same logo with the church's full name as its alt.
+    expect(branding.brandName).toBe("KCCF Ministries");
     expect(branding.brandVisible).toBe(true);
     expect(branding.skipLabel).toBeNull();
     expect(branding.skipText).toBe("Skip to main content");
-    expect(branding.footerName).toBe("KCCF Ministries home");
+    expect(branding.footerName).toBe("Kingdom Covenant of Christ Fellowship");
   });
 
   test("loads a YouTube player only after pressing play, and swaps it from the archive", async () => {

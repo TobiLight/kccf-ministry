@@ -49,15 +49,10 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
             <img
               class="brand-logo-image"
               src={site.imageAssets.logo.src}
-              alt=""
+              alt="KCCF Ministries"
               width={site.imageAssets.logo.width}
               height={site.imageAssets.logo.height}
             />
-            {/* <span class="brand-copy">
-              <strong>KCCF</strong>
-              <span> Ministries</span>
-            </span> */}
-            <span class="visually-hidden"> home</span>
           </a>
           <nav class="desktop-navigation" aria-label="Primary navigation">
             {site.navItems.map((item) => (
