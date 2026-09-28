@@ -19,7 +19,7 @@ export function Card({ children, className = "", eyebrow, title, description, im
     <>
       {image ? <img class="card-image" {...getImageSource(image, cardSizes)} alt={imageAlt} loading="lazy" /> : null}
       <div class="card-content">
-        {eyebrow ? <p class="eyebrow">{eyebrow}</p> : null}
+        {eyebrow ? <p class="eyebrow text-primary!">{eyebrow}</p> : null}
         <h3>{title}</h3>
         {description ? <p>{description}</p> : null}
         {children}
