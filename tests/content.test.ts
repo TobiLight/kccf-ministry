@@ -14,7 +14,7 @@ import {
 } from "../src/content/sermon-feed";
 import { sermons } from "../src/content/sermons";
 import { imageAssets, site } from "../src/content/site";
-import { syncSermons } from "../scripts/sync-sermons";
+import { syncSermons, readSnapshotFromDisk, type SnapshotRead } from "../scripts/sync-sermons";
 
 type SermonSnapshotLike = {
   generatedAt: string;
@@ -32,23 +32,34 @@ type SermonSnapshotLike = {
 
 const feedXml = await readFile(new URL("./fixtures/sermons-feed.xml", import.meta.url), "utf8");
 
-function feedWithVideoIds(...videoIds: string[]) {
-  const entries = videoIds.map(
-    (videoId) => `  <entry>
-    <yt:videoId>${videoId}</yt:videoId>
-    <title>KCCF Ministries Live Stream</title>
-    <published>2026-09-20T13:02:55+00:00</published>
-    <media:description>18th Annual Anniversary</media:description>
-  </entry>`,
+function feedWithEntries(entries: { videoId: string; published: string | null }[]): string {
+  const blocks = entries.map(
+    ({ videoId, published }) =>
+      [
+        "  <entry>",
+        `    <yt:videoId>${videoId}</yt:videoId>`,
+        "    <title>KCCF Ministries Live Stream</title>",
+        published === null ? null : `    <published>${published}</published>`,
+        "    <media:description>18th Annual Anniversary</media:description>",
+        "  </entry>",
+      ]
+        .filter((line) => line !== null)
+        .join("\n"),
   );
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/">',
     "  <title>KCCF Ministries</title>",
-    ...entries,
+    ...blocks,
     "</feed>",
   ].join("\n");
+}
+
+function feedWithVideoIds(...videoIds: string[]) {
+  return feedWithEntries(
+    videoIds.map((videoId) => ({ videoId, published: "2026-09-20T13:02:55+00:00" })),
+  );
 }
 
 const internalRoutes = ["/", "/about", "/ministries", "/sermons", "/events", "/leadership", "/contact"];
@@ -238,6 +249,58 @@ describe("sermon feed derivation", () => {
 
   test("refuses the whole document when one entry carries a malformed id beside valid ones", () => {
     expect(() => parseFeed(feedWithVideoIds("2zFODEV22G0", "abc def", "45e5ZCa-7Sg"))).toThrow(FeedError);
+  });
+
+  test("refuses a feed whose entry omits published, because a missing date would be committed and 500 the page", () => {
+    expect(() => parseFeed(feedWithEntries([{ videoId: "2zFODEV22G0", published: null }]))).toThrow(FeedError);
+    expect(() => parseFeed(feedWithEntries([{ videoId: "2zFODEV22G0", published: null }]))).toThrow(
+      /published/i,
+    );
+  });
+
+  test("refuses a feed whose published value is empty or not a calendar date", () => {
+    for (const published of ["", "   ", "not-a-date", "2026-13-45T00:00:00+00:00", "20260920"]) {
+      expect(() => parseFeed(feedWithEntries([{ videoId: "2zFODEV22G0", published }]))).toThrow(FeedError);
+      expect(() => parseFeed(feedWithEntries([{ videoId: "2zFODEV22G0", published }]))).toThrow(
+        /published/i,
+      );
+    }
+  });
+
+  test("names the malformed published value in the refusal so a missing date is diagnosable", () => {
+    expect(() => parseFeed(feedWithEntries([{ videoId: "2zFODEV22G0", published: "" }]))).toThrow(
+      /published/,
+    );
+    expect(() => parseFeed(feedWithEntries([{ videoId: "2zFODEV22G0", published: "not-a-date" }]))).toThrow(
+      /not-a-date/,
+    );
+  });
+
+  test("refuses the whole document when one entry has no published date beside valid ones", () => {
+    expect(() =>
+      parseFeed(
+        feedWithEntries([
+          { videoId: "2zFODEV22G0", published: "2026-09-20T13:02:55+00:00" },
+          { videoId: "45e5ZCa-7Sg", published: null },
+        ]),
+      ),
+    ).toThrow(FeedError);
+  });
+
+  test("accepts every real timestamp shape YouTube publishes a date in", () => {
+    const stamps = [
+      "2026-09-20T13:02:55+00:00",
+      "2026-09-20T13:02:55Z",
+      "2026-02-28T00:00:00+00:00",
+      "2024-02-29T00:00:00+00:00",
+      "2026-09-20T13:02:55.123Z",
+    ];
+
+    for (const published of stamps) {
+      expect(parseFeed(feedWithEntries([{ videoId: "2zFODEV22G0", published }]))).toHaveLength(1);
+    }
+
+    expect(parseFeed(feedXml)).toHaveLength(7);
   });
 
   test("still accepts conforming video ids of every allowed shape", () => {
@@ -465,11 +528,72 @@ describe("resolveSermons", () => {
 
     expect(merged.find((sermon) => sermon.youtubeId === "eboHWsOsGHY")?.needsCuration).toBe(true);
   });
+
+  test("leaves a snapshot entry with no usable date out of the page list so the page still renders", () => {
+    const poisoned = {
+      generatedAt: "2026-09-26T00:00:00.000Z",
+      channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+      entries: [
+        {
+          youtubeId: "DATED0000000",
+          title: "A sermon whose feed entry lost its date",
+          speaker: "Bishop Olayinka Adeyinka",
+          publishedAt: "",
+          partIndex: 1,
+          partCount: 1,
+          needsCuration: true,
+        },
+        ...snapshot.entries,
+      ],
+    } satisfies SermonSnapshotLike;
+    const merged = resolveSermons([], poisoned);
+
+    expect(merged.some((sermon) => sermon.youtubeId === "DATED0000000")).toBe(false);
+    expect(merged).toHaveLength(7);
+    expect(() => merged.forEach((sermon) => formatSermonDate(sermon.date))).not.toThrow();
+  });
+
+  test("keeps a dateless snapshot entry in the snapshot itself, because only the page list is filtered", () => {
+    const preserved = {
+      generatedAt: "2026-09-26T00:00:00.000Z",
+      channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+      entries: [
+        {
+          youtubeId: "DATED0000000",
+          title: "A sermon whose feed entry lost its date",
+          speaker: "Bishop Olayinka Adeyinka",
+          publishedAt: "",
+          partIndex: 1,
+          partCount: 1,
+          needsCuration: true,
+        },
+      ],
+    } satisfies SermonSnapshotLike;
+    const next = buildSnapshot(preserved, parseFeed(feedXml), "UCRNGCZhVNV2Pj80fs20GNog", "2026-09-27T00:00:00.000Z");
+
+    expect(next.entries.some((entry) => entry.youtubeId === "DATED0000000")).toBe(true);
+    expect(next.entries).toHaveLength(8);
+  });
+
+  test("never drops a curated sermon for a bad date, because the curated file is the archive of record", () => {
+    const curated = [{ title: "Hand written date", date: "not-a-date", youtubeId: "GUup6e4Ccp0" }];
+    const merged = resolveSermons(curated, null);
+
+    expect(merged).toEqual(curated);
+    expect(() => formatSermonDate(merged[0].date)).not.toThrow();
+  });
 });
 
 describe("sermon formatting", () => {
   test("formats an ISO date for display", () => {
     expect(formatSermonDate("2026-09-21")).toBe("September 21, 2026");
+  });
+
+  test("returns the raw value instead of throwing when a date cannot be parsed", () => {
+    for (const undatable of ["", "not-a-date", "2026-13-45", "20260920", "0000-00-00"]) {
+      expect(() => formatSermonDate(undatable)).not.toThrow();
+      expect(formatSermonDate(undatable)).toBe(undatable);
+    }
   });
 
   test("builds a canonical watch url", () => {
@@ -479,7 +603,7 @@ describe("sermon formatting", () => {
 
 type Recorded = { writes: string[]; logs: string[] };
 
-function syncHarness(feedResponse: Response | Error, snapshotOnDisk: string | null): {
+function syncHarness(feedResponse: Response | Error, snapshotOnDisk: SnapshotRead): {
   deps: Parameters<typeof syncSermons>[0];
   recorded: Recorded;
 } {
@@ -506,11 +630,31 @@ function syncHarness(feedResponse: Response | Error, snapshotOnDisk: string | nu
   };
 }
 
+const absentSnapshot: SnapshotRead = { state: "absent" };
+
+function committedSnapshot(contents: unknown): SnapshotRead {
+  return { state: "ok", contents: JSON.stringify(contents) };
+}
+
+function unreadableSnapshot(reason: string): SnapshotRead {
+  return { state: "error", reason };
+}
+
+const committedEntry = {
+  youtubeId: "GUup6e4Ccp0",
+  title: "Hand-curated title that must survive",
+  speaker: "Bishop Olayinka Adeyinka",
+  publishedAt: "2026-09-17",
+  partIndex: 1,
+  partCount: 1,
+  needsCuration: false,
+};
+
 const feedResponse = () => new Response(feedXml, { status: 200 });
 
 describe("sermon sync safety", () => {
   test("writes a snapshot on a good fetch", async () => {
-    const { deps, recorded } = syncHarness(feedResponse(), null);
+    const { deps, recorded } = syncHarness(feedResponse(), absentSnapshot);
 
     const result = await syncSermons(deps);
 
@@ -520,7 +664,7 @@ describe("sermon sync safety", () => {
   });
 
   test("refuses to write and returns ok:false on a non-200 response", async () => {
-    const { deps, recorded } = syncHarness(new Response("<html>not found</html>", { status: 404 }), null);
+    const { deps, recorded } = syncHarness(new Response("<html>not found</html>", { status: 404 }), absentSnapshot);
 
     const result = await syncSermons(deps);
 
@@ -531,7 +675,7 @@ describe("sermon sync safety", () => {
   test("refuses to write when the feed contains no entries", async () => {
     const { deps, recorded } = syncHarness(
       new Response('<feed xmlns="http://www.w3.org/2005/Atom"></feed>', { status: 200 }),
-      null,
+      absentSnapshot,
     );
 
     const result = await syncSermons(deps);
@@ -541,7 +685,7 @@ describe("sermon sync safety", () => {
   });
 
   test("refuses to write when the network throws", async () => {
-    const { deps, recorded } = syncHarness(new Error("network down"), null);
+    const { deps, recorded } = syncHarness(new Error("network down"), absentSnapshot);
 
     const result = await syncSermons(deps);
 
@@ -551,7 +695,7 @@ describe("sermon sync safety", () => {
 
   test("refuses to write when the feed belongs to a different channel", async () => {
     const wrongChannel = feedXml.replace(/UCRNGCZhVNV2Pj80fs20GNog/g, "UCsomeOtherChannel00000");
-    const { deps, recorded } = syncHarness(new Response(wrongChannel, { status: 200 }), null);
+    const { deps, recorded } = syncHarness(new Response(wrongChannel, { status: 200 }), absentSnapshot);
 
     const result = await syncSermons(deps);
 
@@ -562,7 +706,7 @@ describe("sermon sync safety", () => {
   test("refuses to write when the response is not an atom document", async () => {
     const { deps, recorded } = syncHarness(
       new Response("<!DOCTYPE html><html lang=en><body>not a feed</body></html>", { status: 200 }),
-      null,
+      absentSnapshot,
     );
 
     const result = await syncSermons(deps);
@@ -583,7 +727,7 @@ describe("sermon sync safety", () => {
       "  </entry>",
       "</feed>",
     ].join("\n");
-    const { deps, recorded } = syncHarness(new Response(entriesWithoutVideoId, { status: 200 }), null);
+    const { deps, recorded } = syncHarness(new Response(entriesWithoutVideoId, { status: 200 }), absentSnapshot);
 
     const result = await syncSermons(deps);
 
@@ -592,7 +736,7 @@ describe("sermon sync safety", () => {
   });
 
   test("refuses to write when the committed snapshot is unparseable, so a corrupt file cannot empty the archive", async () => {
-    const { deps, recorded } = syncHarness(feedResponse(), '{ "entries": [ truncated');
+    const { deps, recorded } = syncHarness(feedResponse(), { state: "ok", contents: '{ "entries": [ truncated' });
 
     const result = await syncSermons(deps);
 
@@ -605,7 +749,7 @@ describe("sermon sync safety", () => {
       generatedAt: "2026-09-01T00:00:00.000Z",
       channelId: "UCRNGCZhVNV2Pj80fs20GNog",
     });
-    const { deps, recorded } = syncHarness(feedResponse(), notASnapshot);
+    const { deps, recorded } = syncHarness(feedResponse(), { state: "ok", contents: notASnapshot });
 
     const result = await syncSermons(deps);
 
@@ -613,8 +757,53 @@ describe("sermon sync safety", () => {
     expect(recorded.writes).toHaveLength(0);
   });
 
+  test("refuses to write when a committed snapshot entry is not an entry, rather than crashing the sync", async () => {
+    const malformed = [
+      [null],
+      ["GUup6e4Ccp0"],
+      [{ youtubeId: "GUup6e4Ccp0" }],
+      [{ ...committedEntry, youtubeId: 42 }],
+      [{ ...committedEntry, partIndex: "1" }],
+      [{ ...committedEntry, publishedAt: null }],
+    ];
+
+    for (const entries of malformed) {
+      const { deps, recorded } = syncHarness(
+        feedResponse(),
+        committedSnapshot({ generatedAt: "2026-09-01T00:00:00.000Z", channelId: "UCRNGCZhVNV2Pj80fs20GNog", entries }),
+      );
+
+      const result = await syncSermons(deps);
+
+      expect(result.ok).toBe(false);
+      expect(recorded.writes).toHaveLength(0);
+    }
+  });
+
+  test("refuses to write when the committed snapshot cannot be read, because unreadable is not absent", async () => {
+    const { deps, recorded } = syncHarness(
+      feedResponse(),
+      unreadableSnapshot("it could not be read (EACCES: permission denied)"),
+    );
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+    expect(result.ok === false ? result.reason : "").toMatch(/EACCES/);
+  });
+
+  test("still seeds from nothing when the snapshot file genuinely does not exist", async () => {
+    const { deps, recorded } = syncHarness(feedResponse(), absentSnapshot);
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(true);
+    expect(recorded.writes).toHaveLength(1);
+  });
+
   test("seeds a fresh snapshot only when no snapshot file exists at all", async () => {
-    const { deps, recorded } = syncHarness(feedResponse(), null);
+    const { deps, recorded } = syncHarness(feedResponse(), absentSnapshot);
 
     const result = await syncSermons(deps);
 
@@ -638,7 +827,7 @@ describe("sermon sync safety", () => {
         },
       ],
     });
-    const { deps, recorded } = syncHarness(feedResponse(), existing);
+    const { deps, recorded } = syncHarness(feedResponse(), { state: "ok", contents: existing });
 
     await syncSermons(deps);
     const written = JSON.parse(recorded.writes[0]);
@@ -648,7 +837,7 @@ describe("sermon sync safety", () => {
   });
 
   test("reports counts and names new entries so added 0 is distinguishable from broken", async () => {
-    const { deps, recorded } = syncHarness(feedResponse(), null);
+    const { deps, recorded } = syncHarness(feedResponse(), absentSnapshot);
 
     await syncSermons(deps);
     const report = recorded.logs.join("\n");
@@ -675,11 +864,36 @@ describe("sermon sync safety", () => {
         },
       ],
     });
-    const { deps, recorded } = syncHarness(feedResponse(), existing);
+    const { deps, recorded } = syncHarness(feedResponse(), { state: "ok", contents: existing });
 
     await syncSermons(deps);
 
     expect(recorded.logs.join("\n")).toContain("GONEVIDEO00000");
+  });
+});
+
+describe("reading the committed snapshot from disk", () => {
+  const directory = new URL("./fixtures/", import.meta.url);
+  const committed = new URL("../src/content/sermons.generated.json", import.meta.url);
+
+  test("reports an absent snapshot only when the file genuinely does not exist", () => {
+    expect(readSnapshotFromDisk(new URL("./no-such-snapshot.json", directory))).toEqual({
+      state: "absent",
+    });
+  });
+
+  test("reports any other read failure as an error instead of an absent file", () => {
+    const read = readSnapshotFromDisk(new URL("./", directory));
+
+    expect(read.state).toBe("error");
+    expect(read.state === "error" ? read.reason : "").toMatch(/could not be read/);
+  });
+
+  test("reads the committed snapshot as contents", () => {
+    const read = readSnapshotFromDisk(committed);
+
+    expect(read.state).toBe("ok");
+    expect(read.state === "ok" ? JSON.parse(read.contents).entries.length : 0).toBeGreaterThan(0);
   });
 });
 

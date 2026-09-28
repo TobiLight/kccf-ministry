@@ -89,7 +89,7 @@ export function SermonArchive({ sermons }: SermonArchiveProps) {
 
               return (
                 <li key={sermon.youtubeId ?? sermon.facebookUrl ?? `${sermon.date}-${sermon.title}`}>
-                  <article class={`sermon-row${sermon.needsCuration ? " needs-curation" : ""}`}>
+                  <article class="sermon-row">
                     <div class="sermon-row-main">
                       <time class="sermon-row-date" datetime={sermon.date}>
                         {formatSermonDate(sermon.date)}
@@ -99,7 +99,7 @@ export function SermonArchive({ sermons }: SermonArchiveProps) {
                     </div>
                     <div class="sermon-row-aside">
                       {source ? <span class="sermon-row-badge">{source}</span> : null}
-                      {sermon.needsCuration ? <span class="sermon-row-flag">needs curation</span> : null}
+                      {sermon.needsCuration ? <span class="sermon-row-flag" /> : null}
                       {playAction(sermon)}
                       {facebookAction(sermon)}
                     </div>

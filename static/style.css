@@ -1857,6 +1857,9 @@ section {
   }
   color: var(--color-muted-foreground);
 }
+.sermon-row-flag:empty {
+  display: none;
+}
 .sermon-row-play {
   display: inline-flex;
   align-items: center;

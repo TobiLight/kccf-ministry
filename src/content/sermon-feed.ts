@@ -34,6 +34,22 @@ const PERSON_TITLES = ["bishop", "pastor", "bro", "minister", "dr", "apostle", "
 
 const videoIdPattern = /^[A-Za-z0-9_-]{6,}$/;
 
+const calendarDatePattern = /^\d{4}-\d{2}-\d{2}/;
+
+export function isVideoId(value: unknown): value is string {
+  return typeof value === "string" && videoIdPattern.test(value);
+}
+
+export function usableCalendarDate(value: string): string | null {
+  const candidate = value.slice(0, 10);
+
+  if (!calendarDatePattern.test(candidate)) {
+    return null;
+  }
+
+  return Number.isFinite(Date.parse(`${candidate}T00:00:00Z`)) ? candidate : null;
+}
+
 function decodeXml(value: string): string {
   const cdata = value.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/);
   const text = cdata ? cdata[1] : value;
@@ -73,9 +89,19 @@ export function parseFeed(xml: string): RawFeedEntry[] {
   }));
 
   for (const entry of entries) {
-    if (entry.youtubeId && !videoIdPattern.test(entry.youtubeId)) {
+    if (!entry.youtubeId) {
+      continue;
+    }
+
+    if (!isVideoId(entry.youtubeId)) {
       throw new FeedError(
         `feed carries the malformed video id ${JSON.stringify(entry.youtubeId)}, so it is broken or hostile and nothing was ingested`,
+      );
+    }
+
+    if (!usableCalendarDate(entry.published)) {
+      throw new FeedError(
+        `feed carries the malformed published value ${JSON.stringify(entry.published)} on video ${entry.youtubeId}, so a dateless entry would be committed and break the sermons page, and nothing was ingested`,
       );
     }
   }
@@ -112,7 +138,7 @@ function normaliseGroupKey(title: string): string {
 }
 
 function publishedDate(published: string): string {
-  return published.slice(0, 10);
+  return usableCalendarDate(published) ?? "";
 }
 
 function titleFromDescription(description: string, fallbackTitle: string) {
@@ -210,6 +236,10 @@ export function resolveSermons(curated: Sermon[], snapshot: SermonSnapshot | nul
       continue;
     }
 
+    if (!usableCalendarDate(entry.publishedAt)) {
+      continue;
+    }
+
     const title = entry.partCount > 1 ? `${entry.title} — Part ${entry.partIndex} of ${entry.partCount}` : entry.title;
 
     merged.push({
@@ -236,7 +266,13 @@ export function resolveSermons(curated: Sermon[], snapshot: SermonSnapshot | nul
 const displayDate = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: "UTC" });
 
 export function formatSermonDate(iso: string): string {
-  return displayDate.format(new Date(`${iso}T00:00:00Z`));
+  const day = usableCalendarDate(iso);
+
+  if (day === null) {
+    return iso;
+  }
+
+  return displayDate.format(new Date(`${day}T00:00:00Z`));
 }
 
 export function watchUrlFor(youtubeId: string): string {

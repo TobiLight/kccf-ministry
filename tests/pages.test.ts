@@ -99,7 +99,9 @@ describe("sermons page", () => {
     const { html, main } = await getPage("/sermons");
 
     expectInOrder(main, ["Sermons", "Join us live on Facebook", "The God Who Meets Us", "The Freedom to Serve", "View More on Facebook"]);
-    expect((html.match(/class="card sermon-card"/g) ?? []).length).toBeGreaterThan(0);
+    expect(html.match(/class="card sermon-card"/g) ?? []).toHaveLength(
+      sermons.filter((sermon) => sermon.image).length,
+    );
     expect(html).not.toContain("<video");
     expect(html).toContain("https://www.facebook.com/kccfministries");
   });
@@ -247,6 +249,19 @@ describe("sermons page", () => {
     }
   });
 
+  test("ships the curation flag as a styling hook and no maintainer vocabulary at all", async () => {
+    const { html } = await getPage("/sermons");
+    const flags = [...html.matchAll(/<span class="sermon-row-flag"[^>]*>([\s\S]*?)<\/span>/g)].map(
+      (match) => match[1].trim(),
+    );
+
+    expect(flags.length).toBeGreaterThan(0);
+    expect(flags).toEqual(flags.map(() => ""));
+    expect(html).not.toContain("needs curation");
+    expect(html).not.toContain("needs-curation");
+    expect(html).not.toMatch(/curation/i);
+  });
+
   test("mounts the player above the highlights and the archive", async () => {
     const { html } = await getPage("/sermons");
 
@@ -272,6 +287,9 @@ describe("sermons page", () => {
   test("keeps the existing highlight cards limited to curated artwork", async () => {
     const { html } = await getPage("/sermons");
     const cards = [...html.matchAll(/<article class="card sermon-card">([\s\S]*?)<\/article>/g)].map((m) => m[1]);
+
+    expect(cards).toHaveLength(sermons.filter((sermon) => sermon.image).length);
+    expect(cards.length).toBeGreaterThan(0);
 
     for (const card of cards) {
       expect(card).toContain("card-image");

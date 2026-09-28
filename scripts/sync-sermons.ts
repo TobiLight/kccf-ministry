@@ -1,15 +1,27 @@
 import { readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { buildSnapshot, parseFeed, type RawFeedEntry, type SermonSnapshot } from "../src/content/sermon-feed";
+import {
+  buildSnapshot,
+  isVideoId,
+  parseFeed,
+  type RawFeedEntry,
+  type SermonSnapshot,
+  type SnapshotEntry,
+} from "../src/content/sermon-feed";
 import { site } from "../src/content/site";
 
 const snapshotPath = new URL("../src/content/sermons.generated.json", import.meta.url);
 const helpPath = new URL("./sync-sermons.help.md", import.meta.url);
 
+export type SnapshotRead =
+  | { state: "absent" }
+  | { state: "ok"; contents: string }
+  | { state: "error"; reason: string };
+
 export type SyncDeps = {
   fetchImpl: typeof fetch;
   now: () => Date;
-  readSnapshot: () => string | null;
+  readSnapshot: () => SnapshotRead;
   writeSnapshot: (contents: string) => void;
   log: (line: string) => void;
 };
@@ -21,23 +33,55 @@ export type SyncResult =
 type ExistingSnapshot =
   | { state: "absent" }
   | { state: "valid"; snapshot: SermonSnapshot }
-  | { state: "corrupt"; reason: string };
+  | { state: "unreadable"; reason: string };
 
-function parseExisting(raw: string | null): ExistingSnapshot {
-  if (raw === null) {
+function isSnapshotEntry(value: unknown): value is SnapshotEntry {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const entry = value as Record<string, unknown>;
+
+  return (
+    isVideoId(entry.youtubeId) &&
+    typeof entry.title === "string" &&
+    typeof entry.publishedAt === "string" &&
+    (entry.speaker === null || typeof entry.speaker === "string") &&
+    Number.isInteger(entry.partIndex) &&
+    Number.isInteger(entry.partCount) &&
+    typeof entry.needsCuration === "boolean"
+  );
+}
+
+function parseExisting(read: SnapshotRead): ExistingSnapshot {
+  if (read.state === "absent") {
     return { state: "absent" };
+  }
+
+  if (read.state === "error") {
+    return { state: "unreadable", reason: read.reason };
   }
 
   let parsed: unknown;
 
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(read.contents);
   } catch (error) {
-    return { state: "corrupt", reason: `not valid JSON (${(error as Error).message})` };
+    return { state: "unreadable", reason: `it is not valid JSON (${(error as Error).message})` };
   }
 
   if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as SermonSnapshot).entries)) {
-    return { state: "corrupt", reason: "it has no entries array" };
+    return { state: "unreadable", reason: "it has no entries array" };
+  }
+
+  const entries = (parsed as SermonSnapshot).entries;
+  const malformed = entries.filter((entry) => !isSnapshotEntry(entry));
+
+  if (malformed.length > 0) {
+    return {
+      state: "unreadable",
+      reason: `${malformed.length} of its ${entries.length} entries are not a usable entry, so one carries no video id, title, date, speaker, part counts or curation flag`,
+    };
   }
 
   return { state: "valid", snapshot: parsed as SermonSnapshot };
@@ -78,10 +122,10 @@ export async function syncSermons(deps: SyncDeps): Promise<SyncResult> {
     return { ok: false, reason: `feed does not mention channel ${channelId}` };
   }
 
-  const rawExisting = deps.readSnapshot();
-  const existing = parseExisting(rawExisting);
+  const read = deps.readSnapshot();
+  const existing = parseExisting(read);
 
-  if (existing.state === "corrupt") {
+  if (existing.state === "unreadable") {
     return {
       ok: false,
       reason: `the committed snapshot is unreadable because ${existing.reason}, so refusing to overwrite it and risk dropping every sermon older than the feed window; repair or delete src/content/sermons.generated.json`,
@@ -131,11 +175,15 @@ export async function syncSermons(deps: SyncDeps): Promise<SyncResult> {
   return { ok: true, added: added.length, total: next.entries.length, report: lines.join("\n") };
 }
 
-function readSnapshotFromDisk(): string | null {
+export function readSnapshotFromDisk(path: URL = snapshotPath): SnapshotRead {
   try {
-    return readFileSync(snapshotPath, "utf8");
-  } catch {
-    return null;
+    return { state: "ok", contents: readFileSync(path, "utf8") };
+  } catch (error) {
+    if ((error as { code?: string }).code === "ENOENT") {
+      return { state: "absent" };
+    }
+
+    return { state: "error", reason: `it could not be read (${(error as Error).message})` };
   }
 }
 

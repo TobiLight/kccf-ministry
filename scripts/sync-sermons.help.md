@@ -14,11 +14,15 @@ Run it manually, then commit the changed snapshot:
 - A bad fetch writes nothing and exits non-zero. A wrong playlist id, a private
   playlist, an empty response, a non-200, or a feed for a different channel all
   leave the committed snapshot exactly as it was.
+- A feed entry with no usable `<published>` date is refused for the whole
+  document, the same as a malformed video id. A dateless entry would be committed
+  once and then break the sermons page on every later run.
 - An unreadable committed snapshot also writes nothing and exits non-zero. A
-  file that is not valid JSON, or that has no `entries` array, is never treated
-  as "no snapshot yet" and never reseeded from the feed window, because that
-  would silently drop every sermon older than the feed. Fix or delete the file
-  and run again.
+  file that cannot be read at all, is not valid JSON, has no `entries` array, or
+  holds an entry that is not a usable entry is never treated as "no snapshot yet"
+  and never reseeded from the feed window, because that would silently drop every
+  sermon older than the feed. Fix or delete the file and run again. Only a file
+  that genuinely does not exist seeds a fresh snapshot.
 - The feed only exposes roughly the last fifteen uploads, which for this channel
   is about five days. It is a tripwire for "did we miss a service", not an
   archive.
