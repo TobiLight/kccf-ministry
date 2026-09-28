@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "../src/index";
 import { events, pastEvents, upcomingEvents } from "../src/content/events";
+import { resolveSermons } from "../src/content/sermon-feed";
+import snapshot from "../src/content/sermons.generated.json";
+import { sermons } from "../src/content/sermons";
 import { site } from "../src/content/site";
 import { canonicalAddress } from "./content.test";
 
@@ -113,11 +116,13 @@ describe("ministries page", () => {
 });
 
 describe("sermons page", () => {
-  test("renders the live banner and six non-clickable message cards", async () => {
+  test("renders the live banner and the curated message cards", async () => {
     const { html, main } = await getPage("/sermons");
 
     expectInOrder(main, ["Sermons", "Join us live on Facebook", "The God Who Meets Us", "The Freedom to Serve", "View More on Facebook"]);
-    expect((html.match(/class="card sermon-card"/g) ?? [])).toHaveLength(6);
+    expect(html.match(/class="card sermon-card"/g) ?? []).toHaveLength(
+      sermons.filter((sermon) => sermon.image).length,
+    );
     expect(html).not.toContain("<video");
     expect(html).toContain("https://www.facebook.com/kccfministries");
   });
@@ -137,6 +142,179 @@ describe("sermons page", () => {
     expect(liveBanner).not.toContain(">f</div>");
     expect(html).not.toContain("Sermon archive");
     expect(html).not.toContain("sermon-date-note");
+  });
+
+  test("renders a no-cookie YouTube facade that loads nothing until play is pressed", async () => {
+    const { html } = await getPage("/sermons");
+
+    expect(html).toContain('id="sermon-player"');
+    expect(html).toContain('class="sermon-player"');
+    expect(html).toMatch(/id="sermon-player"[^>]*tabindex="-1"/);
+    expect(html).toContain('data-signals="{&quot;sermon&quot;:{&quot;videoId&quot;:&quot;&quot;}}"');
+    expect(html).toContain('class="sermon-player-frame"');
+    expect(html).toContain('class="sermon-facade" data-show="$sermon.videoId === &#39;&#39;"');
+    expect(html).toContain("youtube-nocookie.com/embed/");
+    expect(html).not.toContain("youtube.com/embed/");
+    expect(html).not.toContain("connect.facebook.net");
+  });
+
+  test("ships no non-module script, whatever the attribute order", async () => {
+    const { html } = await getPage("/sermons");
+    const scriptTags = [...html.matchAll(/<script\b[^>]*>/g)].map((match) => match[0]);
+
+    expect(scriptTags.length).toBeGreaterThan(0);
+    expect(scriptTags.filter((tag) => !/type="module"/.test(tag))).toEqual([]);
+  });
+
+  test("gives the facade play control a real accessible name that contains its visible label", async () => {
+    const { html } = await getPage("/sermons");
+    const control = html.match(/<button[^>]*class="sermon-facade-play"[^>]*>[\s\S]*?<\/button>/)?.[0];
+
+    expect(control).toBeDefined();
+    const label = control?.match(/aria-label="([^"]+)"/)?.[1];
+    expect(label?.startsWith("Play message")).toBe(true);
+    expect(label).toContain("Play message");
+    expect(control).toContain('type="button"');
+    expect(control).toContain('<span class="sermon-facade-label">Play message</span>');
+  });
+
+  test("assigns a real video id to the facade click instead of an absent one", async () => {
+    const { html } = await getPage("/sermons");
+    const click = html.match(/class="sermon-facade-play"[^>]*data-on:click="([^"]+)"/)?.[1];
+
+    expect(click).toBeDefined();
+    expect(click).toMatch(/^\$sermon\.videoId = &quot;[A-Za-z0-9_-]{6,}&quot;$/);
+    expect(html).not.toMatch(/data-on:click="[^"]*undefined/);
+  });
+
+  test("keeps the embed iframe titled, lazy, and sandboxed to a no-cookie host", async () => {
+    const { html } = await getPage("/sermons");
+    const iframe = html.match(/<iframe[^>]*class="sermon-player-embed"[^>]*>/)?.[0];
+
+    expect(iframe).toBeDefined();
+    expect(iframe).toContain('data-show="$sermon.videoId !== &#39;&#39;"');
+    expect(iframe).toMatch(/data-attr:src="\$sermon\.videoId \? &#39;https:\/\/www\.youtube-nocookie\.com\/embed\/&#39;/);
+    expect(iframe).toMatch(/title="[^"]+"/);
+    expect(iframe).toContain('loading="lazy"');
+    expect(iframe).toContain('allow="autoplay; encrypted-media; picture-in-picture; fullscreen"');
+    expect(iframe).toContain("allowfullscreen");
+  });
+
+  test("keeps a no-javascript watch link beside the player", async () => {
+    const { html } = await getPage("/sermons");
+
+    expect(html).toContain("https://www.youtube.com/watch?v=");
+    expect(html).toContain(">Watch on YouTube</span>");
+  });
+
+  test("groups the archive by year and labels every row's source", async () => {
+    const { html } = await getPage("/sermons");
+
+    expect(html).toContain('class="sermon-archive"');
+    expect(html).toContain("sermon-archive-year");
+    expect(html).toContain("sermon-row-badge");
+    expect(html).toMatch(/<time\b[^>]*datetime="\d{4}-\d{2}-\d{2}"/);
+  });
+
+  test("gives every YouTube archive row a play control and a no-javascript link", async () => {
+    const { html } = await getPage("/sermons");
+    const rows = [...html.matchAll(/<article class="sermon-row[\s\S]*?<\/article>/g)].map((match) => match[0]);
+    const youtubeRows = rows.filter((row) => row.includes("watch?v="));
+
+    expect(youtubeRows.length).toBeGreaterThan(0);
+
+    for (const row of youtubeRows) {
+      expect(row).toMatch(/class="sermon-row-play"/);
+      expect(row).toContain("https://www.youtube.com/watch?v=");
+      expect(row).not.toContain("youtube.com/embed/");
+    }
+  });
+
+  test("drives the featured player from a row and names that control for assistive technology", async () => {
+    const { html } = await getPage("/sermons");
+    const control = html.match(/<button[^>]*class="sermon-row-play"[^>]*>[\s\S]*?<\/button>/)?.[0];
+    const click = control?.match(/data-on:click="([^"]+)"/)?.[1];
+    const videoId = control?.match(/\$sermon\.videoId = &quot;([^&]+)&quot;/)?.[1];
+    const label = control?.match(/aria-label="([^"]+)"/)?.[1];
+
+    expect(control).toBeDefined();
+    expect(click).toMatch(
+      /^\$sermon\.videoId = &quot;[A-Za-z0-9_-]{6,}&quot;; document\.getElementById\(&#39;sermon-player&#39;\)\?\.focus\(\)$/,
+    );
+    expect(videoId).toBeDefined();
+    expect(videoId).not.toBe("");
+    expect(label?.startsWith("Play ")).toBe(true);
+    expect(label).toContain("Play");
+    expect(control).toContain('type="button"');
+    expect(control).toContain(">Play</span>");
+  });
+
+  test("flags a curation row only for the archive entries that still need curating", async () => {
+    const { html } = await getPage("/sermons");
+    const rows = [...html.matchAll(/<article class="sermon-row[\s\S]*?<\/article>/g)].map((match) => match[0]);
+    const archive = resolveSermons(sermons, snapshot).filter((sermon) => sermon.youtubeId || sermon.facebookUrl);
+    const flagged = new Set(
+      archive.filter((sermon) => sermon.needsCuration).map((sermon) => sermon.youtubeId),
+    );
+    const settled = archive.filter((sermon) => !sermon.needsCuration);
+
+    expect(rows).toHaveLength(archive.length);
+    expect(flagged.size).toBeGreaterThan(0);
+    expect(settled.length).toBeGreaterThan(0);
+
+    for (const row of rows) {
+      const youtubeId = row.match(/watch\?v=([^"&]+)"/)?.[1];
+
+      expect(youtubeId).toBeDefined();
+      expect(row.includes("sermon-row-flag")).toBe(flagged.has(youtubeId ?? ""));
+    }
+  });
+
+  test("ships the curation flag as a styling hook and no maintainer vocabulary at all", async () => {
+    const { html } = await getPage("/sermons");
+    const flags = [...html.matchAll(/<span class="sermon-row-flag"[^>]*>([\s\S]*?)<\/span>/g)].map(
+      (match) => match[1].trim(),
+    );
+
+    expect(flags.length).toBeGreaterThan(0);
+    expect(flags).toEqual(flags.map(() => ""));
+    expect(html).not.toContain("needs curation");
+    expect(html).not.toContain("needs-curation");
+    expect(html).not.toMatch(/curation/i);
+  });
+
+  test("mounts the player above the highlights and the archive", async () => {
+    const { html } = await getPage("/sermons");
+
+    expectInOrder(html, [
+      "id=\"sermon-player\"",
+      "sermon-card",
+      "sermon-archive",
+      "View More on Facebook",
+    ]);
+  });
+
+  test("features the newest message and lists only recorded sermons in the archive", async () => {
+    const { html } = await getPage("/sermons");
+    const player = html.slice(html.indexOf("sermon-player-title"), html.indexOf("sermon-archive"));
+    const featuredTitle = player.match(/sermon-player-title">([^<]+)</)?.[1];
+    const firstRowTitle = html.match(/sermon-row-title">([^<]+)</)?.[1];
+
+    expect(featuredTitle).toBeDefined();
+    expect(firstRowTitle).toBeDefined();
+    expect(featuredTitle).toBe(firstRowTitle);
+  });
+
+  test("keeps the existing highlight cards limited to curated artwork", async () => {
+    const { html } = await getPage("/sermons");
+    const cards = [...html.matchAll(/<article class="card sermon-card">([\s\S]*?)<\/article>/g)].map((m) => m[1]);
+
+    expect(cards).toHaveLength(sermons.filter((sermon) => sermon.image).length);
+    expect(cards.length).toBeGreaterThan(0);
+
+    for (const card of cards) {
+      expect(card).toContain("card-image");
+    }
   });
 });
 

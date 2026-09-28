@@ -11,6 +11,7 @@ export function createApp(): Hono {
     secureHeaders({
       contentSecurityPolicy: {
         defaultSrc: ["'self'"],
+        frameSrc: ["'self'", "https://www.youtube-nocookie.com"],
         baseUri: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-eval'"],
         scriptSrcAttr: ["'none'"],

@@ -8,7 +8,7 @@ const chromePath = findChrome();
 
 if (!chromePath) {
   console.warn(
-    "WARNING: real browser smoke suite SKIPPED - no Chrome or Chromium binary is discoverable, so its 5 tests did not run. Set KCCF_CHROME_PATH to a Chrome or Chromium executable to run them.",
+    "WARNING: real browser smoke suite SKIPPED - no Chrome or Chromium binary is discoverable, so its 6 tests did not run. Set KCCF_CHROME_PATH to a Chrome or Chromium executable to run them.",
   );
 }
 
@@ -229,5 +229,60 @@ describe.skipIf(!chromePath)("real browser smoke", () => {
     expect(branding.skipLabel).toBeNull();
     expect(branding.skipText).toBe("Skip to main content");
     expect(branding.footerName).toBe("KCCF Ministries home");
+  });
+
+  test("loads a YouTube player only after pressing play, and swaps it from the archive", async () => {
+    await page.open("/sermons");
+
+    const beforeClick = page.requests.filter((request) => /youtube(-nocookie)?\.com/.test(request.url));
+    expect(beforeClick).toEqual([]);
+
+    const result = await page.evaluate<{
+      initialSrc: string;
+      afterPlay: string;
+      afterSwap: string;
+      facadeVisibleBefore: boolean;
+      facadeVisibleAfterPlay: boolean;
+      targetLabel: string | null;
+    }>(`
+      (async () => {
+        const embed = document.querySelector("iframe.sermon-player-embed");
+        const facade = document.querySelector(".sermon-facade");
+        const initialSrc = embed?.getAttribute("src") ?? "";
+        const facadeVisibleBefore = !facade || facade.getClientRects().length > 0;
+
+        document.querySelector(".sermon-facade-play").click();
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const afterPlay = embed?.getAttribute("src") ?? "";
+        const facadeVisibleAfterPlay = !facade || facade.getClientRects().length > 0;
+
+        const loadedTitle = embed?.getAttribute("title") ?? "";
+        const facadeLabel = document.querySelector(".sermon-facade-play").getAttribute("aria-label");
+        const rows = [...document.querySelectorAll(".sermon-row-play")];
+        const target = rows.find((row) => {
+          const rowTitle = row.closest(".sermon-row").querySelector(".sermon-row-title").textContent.trim();
+          return row.getAttribute("aria-label") !== facadeLabel && rowTitle !== loadedTitle;
+        });
+        const targetLabel = target?.getAttribute("aria-label") ?? null;
+
+        if (target) {
+          target.click();
+          await new Promise((resolve) => setTimeout(resolve, 400));
+        }
+
+        return { initialSrc, afterPlay, afterSwap: embed?.getAttribute("src") ?? "", facadeVisibleBefore, facadeVisibleAfterPlay, targetLabel };
+      })()
+    `);
+
+    expect(result.facadeVisibleBefore).toBe(true);
+    expect(result.initialSrc).toBe("");
+    expect(result.facadeVisibleAfterPlay).toBe(false);
+    expect(result.afterPlay).toContain("https://www.youtube-nocookie.com/embed/");
+    expect(result.afterPlay).toContain("autoplay=1");
+    expect(result.afterPlay).not.toContain("www.youtube.com/embed");
+    expect(result.targetLabel).not.toBeNull();
+    expect(result.afterSwap).toContain("https://www.youtube-nocookie.com/embed/");
+    expect(result.afterSwap).not.toBe(result.afterPlay);
+    expect(page.problems).toEqual([]);
   });
 });

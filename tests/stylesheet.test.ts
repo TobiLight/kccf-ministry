@@ -367,6 +367,32 @@ describe("shipped stylesheet contract", () => {
       expect(findRules(rules, ".site-header-grid")).toEqual([]);
     }
   });
+
+  test("keeps the sermon player and archive contracts in both stylesheets", async () => {
+    for (const rules of [parseStylesheet(await readSourceStylesheet()), parseStylesheet(await readShippedStylesheet())]) {
+      expect(findValue(rules, ".sermon-player-frame", "aspect-ratio")).toEqual(["16 / 9"]);
+      expect(findValue(rules, ".sermon-player-embed", "position")).toEqual(["absolute"]);
+      expect(findValue(rules, ".sermon-facade", "position")).toEqual(["absolute"]);
+      expect(findValue(rules, ".sermon-player-embed, .sermon-facade", "position")).toEqual([]);
+      expect(findValue(rules, ".sermon-facade-play", "border-radius")).toEqual(["999px"]);
+      expect(findValue(rules, ".sermon-archive", "display")).toEqual(["grid"]);
+      expect(findValue(rules, ".sermon-row-badge", "text-transform")).toEqual(["uppercase"]);
+      expect(findValue(rules, ".sermon-row-flag", "text-transform")).toEqual(["uppercase"]);
+      expect(findValue(rules, ".sermon-row", "grid-template-columns", "@media (min-width: 48rem)")).toEqual([
+        "minmax(0, 1fr) auto",
+      ]);
+    }
+  });
+
+  test("keeps the sermon player free of motion so reduced-motion needs no override", async () => {
+    for (const rules of [parseStylesheet(await readSourceStylesheet()), parseStylesheet(await readShippedStylesheet())]) {
+      const moving = findDeclarations(rules, ".sermon-player-frame").filter(
+        (declaration) => declaration.property === "transition" || declaration.property === "animation",
+      );
+
+      expect(moving).toEqual([]);
+    }
+  });
 });
 
 describe("past event treatment", () => {

@@ -1,4 +1,4 @@
-import type { ContactInfo, ImageAsset, NavItem, ServiceTime, SocialLink } from "./types";
+import type { ContactInfo, ImageAsset, NavItem, ServiceTime, SocialLink, YoutubeChannel } from "./types";
 
 const address = "13-17 Taiwo Akinsulire Street, Off Taiwo Ajakaiye Street, Foursquare bus stop, Ikotun-Ikosi Road, Ikotun, Lagos, Nigeria";
 
@@ -13,6 +13,12 @@ const contact: ContactInfo = {
 };
 
 const social: SocialLink[] = [{ label: "Facebook", href: contact.facebookUrl }];
+
+const youtube: YoutubeChannel = {
+  channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+  channelUrl: "https://www.youtube.com/@kccfministries1579",
+  playlistId: "",
+};
 
 const navItems: NavItem[] = [
   { label: "Home", href: "/" },
@@ -128,6 +134,7 @@ export const site = {
   mobileNavItems,
   contact,
   social,
+  youtube,
   services,
   images: {
     hero: imageAssets.hero.src,
