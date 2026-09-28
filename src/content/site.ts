@@ -49,31 +49,29 @@ const heroSrcset = [
 const worshipMomentSrcset = [
   "/static/images/worship-moment-640.jpg 640w",
   "/static/images/worship-moment-1024.jpg 1024w",
-  "/static/images/worship-moment-1600.jpg 1600w",
-  "/static/images/worship-moment.jpg 6000w",
+  "/static/images/worship-moment.jpg 1600w",
 ].join(", ");
 
 const prayerFellowshipSrcset = [
   "/static/images/prayer-fellowship-640.jpg 640w",
   "/static/images/prayer-fellowship-1024.jpg 1024w",
-  "/static/images/prayer-fellowship-1600.jpg 1600w",
-  "/static/images/prayer-fellowship.jpg 6000w",
+  "/static/images/prayer-fellowship.jpg 1600w",
 ].join(", ");
 
 const imageAssetMap = {
   hero: {
     src: "/static/images/hero.jpg",
     width: 2048,
-    height: 1365,
-    alt: "Congregation",
+    height: 1366,
+    alt: "Congregation standing together during a Sunday service",
     srcset: heroSrcset,
     sizes: "100vw",
   },
   prayerFellowship: {
     src: "/static/images/prayer-fellowship.jpg",
-    width: 6000,
-    height: 4000,
-    alt: "People holding hands in prayer",
+    width: 1600,
+    height: 1066,
+    alt: "A member of the congregation greeting children during a church service",
     srcset: prayerFellowshipSrcset,
     sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
   },
@@ -88,13 +86,13 @@ const imageAssetMap = {
   },
   worshipMoment: {
     src: "/static/images/worship-moment.jpg",
-    width: 6000,
-    height: 4000,
-    alt: "Hands raised in worship",
+    width: 1600,
+    height: 1066,
+    alt: "Members of the worship band playing during a Sunday service",
     srcset: worshipMomentSrcset,
     sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
   },
-  bibleStudy: { src: "/static/images/bible-study.jpg", width: 800, height: 600, alt: "Hands resting on an open Bible" },
+  bibleStudy: { src: "/static/images/bible-study.jpg", width: 2048, height: 1365, alt: "Hands resting on an open Bible" },
   pastorOne: { src: "/static/images/pastor-1.jpg", width: 2048, height: 1365, alt: "" },
   pastorTwo: { src: "/static/images/pastor-2.jpg", width: 600, height: 800, alt: "" },
 } satisfies Record<string, ImageAsset>;

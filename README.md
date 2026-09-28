@@ -22,7 +22,7 @@ The application exposes:
 - `/about` - Calling, beliefs, story, and leaders
 - `/ministries` - Six ministry opportunities
 - `/sermons` - Recent messages and Facebook viewing links
-- `/events` - Weekly services, the monthly Transformation Night, and featured events
+- `/events` - Weekly services, the monthly Transformation Night, upcoming events, and past events
 - `/leadership` - Pastoral and ministry leadership
 - `/contact` - Contact details, visit information, and frontend-only form
 - `/static/*` - Files served from the project root's `static/` directory
@@ -74,20 +74,39 @@ The tradeoff and its boundaries:
 
 ## Responsive images
 
-The four multi-megabyte originals stay in place as the `src` fallback, but every one of them now has width-descriptor variants generated with ffmpeg and verified as valid JPEG:
+Four assets ship a width-descriptor ladder. `about` is the only one whose full-size file is
+genuinely large; the other three are already under half a megabyte. The dimensions below were
+read back off the JPEG headers with `ffprobe`:
 
-| original | declared size | variants |
-| --- | --- | --- |
-| `about.jpg` | 4389x3292 | 640, 1024, 1600, 2400 |
-| `hero.jpg` | 2048x1365 | 640, 1024, 1600 (full-bleed home hero, `sizes="100vw"`) |
-| `worship-moment.jpg` | 6000x4000 | 640, 1024, 1600 |
-| `prayer-fellowship.jpg` | 6000x4000 | 640, 1024, 1600 |
+| asset | full-size file | declared size | on-disk size | variants in the ladder |
+| --- | --- | --- | --- | --- |
+| `about` | `about.jpg` | 4389x3292 | 1.3 MB | 640, 1024, 1600, 2400 |
+| `hero` | `hero.jpg` | 2048x1366 | 420 KB | 640, 1024, 1600, plus the full-size file (full-bleed home hero, `sizes="100vw"`) |
+| `worshipMoment` | `worship-moment.jpg` | 1600x1066 | 166 KB | 640, 1024, plus the full-size file |
+| `prayerFellowship` | `prayer-fellowship.jpg` | 1600x1066 | 311 KB | 640, 1024, plus the full-size file |
 
-`srcset` and `sizes` are declared once per asset in the `imageAssetMap` in `src/content/site.ts`. `getImageSource(src, sizes?)` resolves an asset into `{ src, srcset, sizes, width, height }`, and `PageHero`, `Card`, and the editorial images use it, so a browser that understands `srcset` never downloads a 6000px original. Regenerate a variant with:
+`worship-moment` and `prayer-fellowship` have no `-1600.jpg` file: their bare file *is* the
+1600 rung. Ladders are listed ascending by descriptor, and a full-size file is listed in a
+ladder only when no wider derivative exists, which is the `hero` case.
+
+`srcset` and `sizes` are declared once per asset in the `imageAssetMap` in `src/content/site.ts`.
+`getImageSource(src, sizes?)` resolves an asset into `{ src, srcset, sizes, width, height }`, and
+`PageHero`, `Card`, and the editorial images use it, so a browser that understands `srcset` never
+downloads a 4389px `about` original.
+
+**Regenerate a ladder with `bun run image:variants`, not by hand.** It refuses to upscale, refuses
+to overwrite a full-size file without `--force`, dedupes repeated `--widths`, and prints a
+paste-ready `srcset` literal sorted ascending plus the real `width`/`height` read back from the
+files it just wrote. The sizes it prints are already checked against the real JPEG headers by
+`tests/assets.test.ts`, so a hand-written command that guesses a dimension fails the suite.
 
 ```bash
-ffmpeg -y -i static/images/hero.jpg -vf "scale=1600:-2:flags=lanczos" -q:v 2 -map_metadata -1 static/images/hero-1600.jpg
+bun run image:variants static/images/hero.jpg hero --widths 640,1024,1600 --src-width 2048 --force
 ```
+
+Do not hand-roll an `ffmpeg` invocation: the committed variants are written at `-q:v 4` and
+reproducing them at `-q:v 2` while also stripping metadata yields a file about 56% larger than the
+one in the repository.
 
 ## Interactions and accessibility
 

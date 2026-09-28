@@ -12,7 +12,6 @@ export function MinistriesPage() {
         title="Our Ministries"
         description="There is a meaningful way for every person to worship, serve, learn, and belong."
         image={site.images.bibleStudy}
-        imageAlt="Hands resting on an open Bible"
       />
 
       <section class="ministries-intro-section section-cream">

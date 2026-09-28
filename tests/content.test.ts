@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { events, monthlyService } from "../src/content/events";
+import { events, formatEventSchedule, monthlyService, pastEvents, upcomingEvents } from "../src/content/events";
 import { leadership } from "../src/content/leadership";
 import { ministries } from "../src/content/ministries";
 import { sermons } from "../src/content/sermons";
@@ -69,7 +69,7 @@ describe("site content", () => {
     expect(ministries).toHaveLength(6);
     expect(sermons).toHaveLength(6);
     expect(leadership.pastors).toHaveLength(2);
-    expect(leadership.ministryLeaders).toHaveLength(5);
+    expect(leadership.ministryLeaders).toHaveLength(6);
   });
 
   test("carries image metadata on every leader instead of positional lookups", () => {
@@ -84,7 +84,69 @@ describe("site content", () => {
     }
   });
 
-  test("intentionally has no featured events yet", () => {
-    expect(events).toEqual([]);
+  test("publishes five past and four upcoming church events", () => {
+    expect(events).toHaveLength(9);
+    expect(pastEvents).toHaveLength(5);
+    expect(upcomingEvents).toHaveLength(4);
+  });
+
+  test("splits events into upcoming and past with no overlap and no loss", () => {
+    expect(upcomingEvents.length + pastEvents.length).toBe(events.length);
+    expect(upcomingEvents.every((event) => event.status === "upcoming")).toBe(true);
+    expect(pastEvents.every((event) => event.status === "past")).toBe(true);
+    expect(events.filter((event) => event.status === "upcoming")).toEqual(upcomingEvents);
+    expect(events.filter((event) => event.status === "past")).toEqual(pastEvents);
+  });
+
+  test("gives every event a title, location, and description", () => {
+    for (const event of events) {
+      expect(event.title).toBeTruthy();
+      expect(event.location).toBe("KCCF Mount Zion, Ikotun, Lagos");
+      expect(event.description).toBeTruthy();
+    }
+  });
+
+  test("keeps event titles unique", () => {
+    const titles = events.map((event) => event.title);
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+
+  test("gives no event a photograph, gallery, or slug", () => {
+    for (const event of events) {
+      for (const key of ["image", "images", "photos", "slug"]) {
+        expect(Object.keys(event)).not.toContain(key);
+      }
+    }
+  });
+
+  test("orders past events newest first as authored", () => {
+    const dates = pastEvents.map((event) => event.date);
+    expect(dates).toEqual([
+      "September 20, 2026",
+      "September 21, 2025",
+      "September 19, 2025",
+      "July 20, 2025",
+      "June 1, 2025",
+    ]);
+  });
+
+  test("formats an announced schedule and falls back when nothing is announced", () => {
+    expect(formatEventSchedule({ ...events[0], date: "September 20, 2026", time: "10:00 PM" })).toBe(
+      "September 20, 2026 · 10:00 PM",
+    );
+    expect(formatEventSchedule({ ...events[0], date: "November 2026", time: undefined })).toBe("November 2026");
+    expect(formatEventSchedule({ ...events[0], date: undefined, time: "10:00 PM" })).toBe("10:00 PM");
+    expect(formatEventSchedule({ ...events[0], date: undefined, time: undefined })).toBe("Date to be announced");
+  });
+
+  test("renders every past event date in long form", () => {
+    for (const event of pastEvents) {
+      expect(event.date).toMatch(/^[A-Z][a-z]+ \d{1,2}, \d{4}$/);
+    }
+  });
+
+  test("gives only the 2026 anniversary a recap", () => {
+    expect(pastEvents.filter((event) => event.recap)).toHaveLength(1);
+    expect(pastEvents[0].recap).toBeTruthy();
   });
 });

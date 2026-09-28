@@ -17,7 +17,7 @@ These are project-wide requirements. Every task's requirements implicitly includ
 - **Bun is the only package manager.** `bun.lock` is the only lockfile. Do not add `package-lock.json`, `yarn.lock`, or `pnpm-lock.yaml`.
 - **No new dependencies.** `package.json` gains no entries. The variant script shells out to the already-installed `ffmpeg` via `Bun.spawn`, matching the dependency-free style of `scripts/dev.ts`.
 - **`static/style.css` is generated, never hand-edited.** Author new rules in `src/input.css` and run `bun run css:build`. `tests/stylesheet.test.ts` asserts against **both** files, and `bun run check` runs `css:build` before `test` for exactly this reason.
-- **The full gate is `bun run check`**, which runs `type-check -> css:build -> test -> build` in that order. A change is not done until `bun run check` passes.
+- **The gate is `bun run check`**, which runs `type-check -> css:build -> test -> build` in that order. A change is not done until it passes — **with one known exception that is not this plan's to fix.** `tests/browser.test.ts` ("brands the header, links a favicon, and names the skip link once") fails at `expect(branding.brandVisible).toBe(true)` because the maintainer commented out the visible brand copy in `src/components/site-header.tsx` in commit `ae1aef0`. Do not uncomment it: that reverses a deliberate edit and is the maintainer's call. Every other test must pass.
 - **Event `date` and `time` are human display strings, never parsed.** The codebase has no `Date` parsing and must not gain any. Do not add `new Date()`, `Date.parse`, `.sort()` on dates, or ISO dates to the event model.
 - **`status` is hand-set and must never be computed.** No event is classified by comparing dates to the clock.
 - **Every past/upcoming split goes through `upcomingEvents` / `pastEvents`.** Never call `.filter()` on `events` inside a component.
@@ -50,6 +50,7 @@ These are project-wide requirements. Every task's requirements implicitly includ
 | `src/input.css` | Two new classes: `.past-event-card`, `.event-recap`. |
 | `tests/content.test.ts` | Replaces the "intentionally has no featured events yet" assertion. |
 | `tests/pages.test.ts` | Updates the `/events` and home-page render contracts. |
+| `tests/assets.test.ts` | Task 4 Step 10 only: drops the two 1600-rung `generatedVariants` rows. `:110-114` and `:118-138` unchanged |
 | `tests/interactions.test.ts` | The two alt-text assertions at `:276` (`hero`) and `:282` (`prayerFellowship`). `:273`, `:279`, and `:166-168` are unchanged |
 | `tests/tooling.test.ts` | Task 2 only: asserts the committed `image:variants` script and that the generator uses `ffmpeg` `signalstats`. |
 | `tests/stylesheet.test.ts` | New contract for the two new classes in both stylesheets. |
@@ -63,7 +64,7 @@ These are project-wide requirements. Every task's requirements implicitly includ
 - `static/images/prayer-640.jpg`, `static/images/prayer-1024.jpg`, `static/images/prayer-1600.jpg` — untracked duplicates of the correctly-named rungs.
 - `static/images/prayer-fellowship-1024jpg` — corrupt, missing the dot before the extension.
 
-**Not touched:** `tests/assets.test.ts` (its only hardcoded assertions are `imageAssets.hero` at `:110-114` and `imageAssets.about` at `:118-138`, neither of which this plan changes; the dimension and variant-width checks at `:167-185` are generic and pass once files match declarations, which is exactly what makes them Task 4's gate), `src/components/ui/card.tsx` (already supports an absent `image`, so the text-only event card needs no change), `src/routes/index.ts`, `src/index.ts`, `Dockerfile`, `docker-compose*.yml`, `tests/components.test.ts` (its `Card` assertion at `:283-294` renders a synthetic `/media` route, so it never reaches the events page), `tests/browser.test.ts`, `tests/routes.test.ts` (its `aria-labelledby` and id-uniqueness contract at `:81-93` already covers the new `past-events-title` id with no edit).
+**Not touched:** `src/components/ui/card.tsx` (already supports an absent `image`, so the text-only event card needs no change), `src/routes/index.ts`, `src/index.ts`, `Dockerfile`, `docker-compose*.yml`, `tests/components.test.ts` (its `Card` assertion at `:283-294` renders a synthetic `/media` route, so it never reaches the events page), `tests/browser.test.ts`, `tests/routes.test.ts` (its `aria-labelledby` and id-uniqueness contract at `:81-93` already covers the new `past-events-title` id with no edit).
 
 `package.json` and `tests/tooling.test.ts` are **modified by Task 2 only**, to register and assert the `image:variants` script. No dependency is added.
 
@@ -82,8 +83,9 @@ Tasks 1–4 are the image phase. Tasks 5–9 are the events phase. The image pha
 `bun test tests/assets.test.ts` currently fails five assertions because a prior rename of `prayer-fellowship-*` to `prayer-*` was started and never propagated to any source file. This task restores the three good rungs and deletes the four strays. It deliberately does **not** make the suite green — the two missing originals are regenerated in Task 4, and the plan says so at that task.
 
 **Files:**
-- Delete: `static/images/prayer-640.jpg`, `static/images/prayer-1024.jpg`, `static/images/prayer-1600.jpg`, `static/images/prayer-fellowship-1024jpg`
-- Restore: `static/images/prayer-fellowship-640.jpg`, `static/images/prayer-fellowship-1024.jpg`, `static/images/prayer-fellowship-1600.jpg`
+- Rename into place: `static/images/prayer-1024.jpg` → `static/images/prayer-fellowship-1024.jpg`, `static/images/prayer-1600.jpg` → `static/images/prayer-fellowship-1600.jpg`
+- Left in place, still wrong: `static/images/prayer-fellowship-640.jpg` (currently 2048px wide). `site.ts` references it, so it must not be deleted here; Task 4 regenerates it at 640.
+- Delete: `static/images/prayer-640.jpg`, `static/images/prayer-fellowship-1024jpg`
 
 **Interfaces:**
 - Consumes: nothing.
@@ -92,7 +94,7 @@ Tasks 1–4 are the image phase. Tasks 5–9 are the events phase. The image pha
 - [ ] **Step 1: Confirm the current broken state**
 
 Run: `ls -1 static/images/ | rg 'prayer'`
-Expected: exactly this list, which shows the stray malformed name and the absence of the real original:
+Expected: exactly this list. The `prayer-*.jpg` names are the abandoned rename, the missing-dot name is the corrupt stray, and `prayer-fellowship.jpg` is absent:
 
 ```
 prayer-1024.jpg
@@ -101,6 +103,8 @@ prayer-640.jpg
 prayer-fellowship-1024jpg
 prayer-fellowship-640.jpg
 ```
+
+All of these are **tracked**. `git checkout` cannot recover the 1024 and 1600 rungs, because history recorded them as renames into `prayer-1024.jpg` / `prayer-1600.jpg`; they must be renamed back with `git mv`.
 
 - [ ] **Step 2: Record the failing baseline**
 
@@ -124,20 +128,26 @@ Expected: an `is invalid` warning and `0,0`. This proves the file is unrecoverab
 
 - [ ] **Step 4: Confirm the untracked files are duplicates, not originals**
 
-Run: `git cat-file -s $(git rev-parse HEAD:static/images/prayer-fellowship-640.jpg) && stat -c%s static/images/prayer-640.jpg`
-Expected: both print `98556`. Identical sizes prove `prayer-640.jpg` is the renamed rung and is safe to delete in favour of the restored name.
+Run: `stat -c%s static/images/prayer-640.jpg static/images/prayer-fellowship-640.jpg`
+Expected: `98556` then `289789`. This proves `prayer-640.jpg` is the genuine 640px rung and that the file still carrying the `prayer-fellowship-` prefix is the wrong 2048px-wide image. Neither may simply be renamed onto the other without regenerating from a real photograph, which is Task 4's job.
 
-- [ ] **Step 5: Restore the three rungs from HEAD**
-
-```bash
-git checkout -- static/images/prayer-fellowship-640.jpg static/images/prayer-fellowship-1024.jpg static/images/prayer-fellowship-1600.jpg
-```
-
-- [ ] **Step 6: Delete the four strays**
+- [ ] **Step 5: Rename the 1024 and 1600 rungs back to the `prayer-fellowship-` prefix**
 
 ```bash
-rm static/images/prayer-640.jpg static/images/prayer-1024.jpg static/images/prayer-1600.jpg static/images/prayer-fellowship-1024jpg
+git mv static/images/prayer-1024.jpg static/images/prayer-fellowship-1024.jpg
+git mv static/images/prayer-1600.jpg static/images/prayer-fellowship-1600.jpg
 ```
+
+- [ ] **Step 6: Delete the two remaining strays**
+
+```bash
+git rm static/images/prayer-640.jpg static/images/prayer-fellowship-1024jpg
+```
+
+`prayer-fellowship-640.jpg` is deliberately **not** deleted or renamed here. `site.ts:57`
+lists it as the 640w rung, so deleting it would break a fourth fetch before Task 4
+regenerates the ladder. It stays in place, still wrong, until Task 4 replaces it — which is
+why Step 7 expects a variant-width failure to survive this task.
 
 - [ ] **Step 7: Verify the restored rungs have their declared widths**
 
@@ -160,11 +170,17 @@ Expected: `clean`. The abandoned rename never reached any source file, so no sou
 - [ ] **Step 9: Commit**
 
 ```bash
-git add static/images/prayer-fellowship-640.jpg static/images/prayer-fellowship-1024.jpg static/images/prayer-fellowship-1600.jpg
-git commit -m "fix: restore misnamed prayer fellowship image variants"
+git commit -am "fix: restore misnamed prayer fellowship image variants"
 ```
 
-The deletions of the four strays are untracked-file removals, so they need no staging.
+`git mv` and `git rm` already staged everything, so `-a` picks up nothing unintended.
+Do **not** use `git add -A`: a path-scoped `add -A` is a habit that breaks the moment a
+task has a real untracked file it must not stage.
+
+`git mv` and `git rm` already staged the renames and deletions, so this commit records
+exactly **four** paths: two renames and two deletions. `prayer-fellowship-640.jpg` is
+untouched and therefore records nothing. Verify with `git show --stat HEAD` before moving
+on — it should list four.
 
 ---
 
@@ -182,29 +198,109 @@ Creates `scripts/image-variants.ts`. Its whole reason for existing is that `pack
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `tests/tooling.test.ts`:
+Append to `tests/tooling.test.ts`. Reuse the file's existing `readProjectFile` helper at `:6` rather than adding an import. Gate on ffmpeg/ffprobe being present, following the `describe.skipIf` precedent at `tests/browser.test.ts:10,15`, so the suite still runs on a machine without them:
 
 ```ts
-describe("image variant script", () => {
-  test("is committed and exposes a runnable image:variants script", async () => {
-    const source = await readFile(new URL("../scripts/image-variants.ts", import.meta.url), "utf8");
-    const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as {
-      scripts: Record<string, string>;
-    };
+const hasFfmpeg = await Bun.spawn(["ffprobe", "-version"]).exited === 0;
 
-    expect(manifest.scripts["image:variants"]).toBe("bun run scripts/image-variants.ts");
-    expect(source).toContain("ffmpeg");
-    expect(source).toContain("signalstats");
+describe.skipIf(!hasFfmpeg)("image variant generator", () => {
+  const workDir = "/tmp/opencode/image-variants-test";
+
+  test("prints the srcset and real dimensions, and never touches an existing full-size file", async () => {
+    await run("rm -rf " + workDir + " && mkdir -p " + workDir + "/seed");
+    await run(`ffmpeg -y -i static/images/hero.jpg -vf scale=2048:-2 ${workDir}/seed/probe.jpg`);
+
+    const proc = Bun.spawn(
+      ["bun", "run", "scripts/image-variants.ts", `${workDir}/seed/probe.jpg`, "probe", "--widths", "640,1024", "--out", workDir],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const stdout = await new Response(proc.stdout).text();
+    expect(await proc.exited).toBe(0);
+
+    // The printed width/height must match the file on disk, not a computation.
+    const size = await probeSize(`${workDir}/probe.jpg`);
+    expect(stdout).toContain(`width: ${size.width}`);
+    expect(stdout).toContain(`height: ${size.height}`);
+
+    // No two srcset entries may share a width descriptor.
+    const descriptors = [...stdout.matchAll(/ (\d+)w"/g)].map((match) => match[1]);
+    expect(descriptors.length).toBeGreaterThan(0);
+    expect(new Set(descriptors).size).toBe(descriptors.length);
+
+    // The const identifier must be valid TypeScript, not the raw hyphenated base name.
+    expect(stdout).toContain("const probeSrcset = [");
+    expect(stdout).not.toContain("const probe-probeSrcset");
+  });
+
+  test("refuses to overwrite an existing full-size file without --force", async () => {
+    await run(`rm -rf ${workDir} && mkdir -p ${workDir}/out`);
+    await run(`cp static/images/hero.jpg ${workDir}/out/keep.jpg`);
+
+    const before = await sha(`${workDir}/out/keep.jpg`);
+    const refused = Bun.spawn(
+      ["bun", "run", "scripts/image-variants.ts", "static/images/hero.jpg", "keep", "--widths", "640", "--out", `${workDir}/out`],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    expect(await refused.exited).not.toBe(0);
+    expect(await sha(`${workDir}/out/keep.jpg`)).toBe(before);
+
+    const forced = Bun.spawn(
+      ["bun", "run", "scripts/image-variants.ts", "static/images/hero.jpg", "keep", "--widths", "640", "--out", `${workDir}/out`, "--force"],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    expect(await forced.exited).toBe(0);
+    await new Response(forced.stdout).text();
+  });
+
+  test("rejects a width larger than the source instead of upscaling", async () => {
+    const proc = Bun.spawn(
+      ["bun", "run", "scripts/image-variants.ts", "static/images/hero.jpg", "big", "--widths", "9000", "--out", `${workDir}/up`],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const stderr = await new Response(proc.stderr).text();
+
+    expect(await proc.exited).not.toBe(0);
+    expect(stderr).toContain("larger than the source");
   });
 });
 ```
 
-If `tests/tooling.test.ts` does not already import `readFile` from `node:fs/promises`, add that import.
+Add these helpers at the top of the file, next to the existing `readProjectFile`:
+
+```ts
+async function run(command: string) {
+  const proc = Bun.spawn(["bash", "-lc", command], { stdout: "pipe", stderr: "pipe" });
+  const code = await proc.exited;
+  if (code !== 0) throw new Error(`${command} exited ${code}: ${await new Response(proc.stderr).text()}`);
+}
+
+async function probeSize(path: string) {
+  const proc = Bun.spawn(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", path]);
+  const [width, height] = (await new Response(proc.stdout).text()).trim().split(",").map(Number);
+  return { width: width!, height: height! };
+}
+
+async function sha(path: string) {
+  const proc = Bun.spawn(["sha256sum", path]);
+  return (await new Response(proc.stdout).text()).split(" ")[0]!;
+}
+```
+
+Also assert the `package.json` entry in the existing style:
+
+```ts
+test("registers the image:variants script", async () => {
+  const manifest = JSON.parse(await readProjectFile("package.json")) as { scripts: Record<string, string> };
+  expect(manifest.scripts["image:variants"]).toBe("bun run scripts/image-variants.ts");
+});
+```
+
+The point of these three behavioural tests is that `tests/assets.test.ts:167-185` compares declared dimensions against JPEG header bytes, so a script that printed its own computed guesses would still leave every suite green. Only a test that runs the script catches that.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `bun test tests/tooling.test.ts 2>&1 | tail -20`
-Expected: FAIL, with `error:ENOENT` or an undefined `manifest.scripts["image:variants"]`.
+Run: `bun test tests/tooling.test.ts 2>&1 | tail -25`
+Expected: FAIL. `scripts/image-variants.ts` does not exist, so the first assertion fails on a missing file, and the `image:variants` entry is undefined.
 
 - [ ] **Step 3: Create the script**
 
@@ -221,29 +317,68 @@ type Options = {
   baseName: string;
   widths: number[];
   outDir: string;
+  srcWidth?: number;
+  force: boolean;
+  constName?: string;
 };
+
+function fail(message: string): never {
+  console.error(`error: ${message}`);
+  process.exit(1);
+}
+
+function toCamelCase(value: string) {
+  return value.replace(/[^a-zA-Z0-9]+(.)?/g, (_match, char: string | undefined) => (char ? char.toUpperCase() : ""));
+}
 
 function parseArgs(argv: string[]): Options {
   const positional: string[] = [];
   let widths = DEFAULT_WIDTHS;
   let outDir = "static/images";
+  let srcWidth: number | undefined;
+  let force = false;
+  let constName: string | undefined;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    const next = () => {
+      const value = argv[index + 1];
+      if (value === undefined) fail(`${arg} requires a value`);
+      index += 1;
+      return value;
+    };
 
     if (arg === "--widths") {
-      const value = argv[index + 1];
-      if (!value) throw new Error("--widths requires a comma-separated list, e.g. --widths 640,1024");
-      widths = value.split(",").map((part) => Number.parseInt(part.trim(), 10));
-      index += 1;
+      widths = next()
+        .split(",")
+        .map((part) => {
+          const trimmed = part.trim();
+          if (!/^\d+$/.test(trimmed)) fail(`invalid width: "${part}" — expected a positive integer`);
+          return Number.parseInt(trimmed, 10);
+        })
+        .filter((width) => width > 0);
       continue;
     }
 
     if (arg === "--out") {
-      const value = argv[index + 1];
-      if (!value) throw new Error("--out requires a directory, e.g. --out static/images");
-      outDir = value;
-      index += 1;
+      outDir = next();
+      continue;
+    }
+
+    if (arg === "--src-width") {
+      const raw = next();
+      if (!/^\d+$/.test(raw)) fail(`invalid --src-width: "${raw}"`);
+      srcWidth = Number.parseInt(raw, 10);
+      continue;
+    }
+
+    if (arg === "--const-name") {
+      constName = next();
+      continue;
+    }
+
+    if (arg === "--force") {
+      force = true;
       continue;
     }
 
@@ -251,120 +386,116 @@ function parseArgs(argv: string[]): Options {
   }
 
   const [source, baseName] = positional;
-
   if (!source || !baseName) {
-    throw new Error("usage: image-variants <source> <base-name> [--widths 640,1024,1600] [--out static/images]");
+    fail("usage: image-variants <source> <base-name> [--widths 640,1024,1600] [--out static/images] [--src-width N] [--const-name name] [--force]");
   }
 
-  for (const width of widths) {
-    if (!Number.isInteger(width) || width <= 0) throw new Error(`invalid width: ${width}`);
-  }
-
-  return { source, baseName, widths, outDir };
+  return { source: source!, baseName: baseName!, widths: [...widths].sort((a, b) => a - b), outDir, srcWidth, force, constName };
 }
 
 async function run(command: string[]): Promise<string> {
   const proc = Bun.spawn(command, { stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
   const code = await proc.exited;
-
-  if (code !== 0) throw new Error(`${command[0]} exited ${code}: ${stderr.trim()}`);
-
+  if (code !== 0) fail(`${command[0]} exited ${code}: ${stderr.trim()}`);
   return stdout;
 }
 
 async function readJpegSize(path: string): Promise<{ width: number; height: number }> {
   const out = await run([
-    "ffprobe",
-    "-v",
-    "error",
-    "-select_streams",
-    "v:0",
-    "-show_entries",
-    "stream=width,height",
-    "-of",
-    "csv=p=0",
-    path,
+    "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", path,
   ]);
   const [width, height] = out.trim().split(",").map((part) => Number.parseInt(part.trim(), 10));
-
-  if (!width || !height) throw new Error(`could not read JPEG dimensions from ${path} (got "${out.trim()}")`);
-
-  return { width, height };
-}
-
-async function readRotationTag(path: string): Promise<string> {
-  const out = await run([
-    "ffprobe",
-    "-v",
-    "error",
-    "-select_streams",
-    "v:0",
-    "-show_entries",
-    "stream_tags=rotate:stream_side_data=rotation",
-    "-of",
-    "default=nw=1:nk=1",
-    path,
-  ]);
-  return out.trim();
+  if (!width || !height) fail(`could not read JPEG dimensions from ${path} (got "${out.trim()}")`);
+  return { width: width!, height: height! };
 }
 
 function scaleExpression(width: number): string {
-  // Round the height to an even number so the encoder gets well-formed chroma planes.
   return `scale=${width}:-2:flags=lanczos`;
 }
 
 const options = parseArgs(Bun.argv.slice(2));
 const sourcePath = resolve(options.source);
-const outDir = resolve(options.outDir);
+const sourceSize = await readJpegSize(sourcePath).catch(() => fail(`cannot read source image: ${options.source}`));
 
+const srcWidth = options.srcWidth ?? sourceSize.width;
+if (srcWidth > sourceSize.width) {
+  fail(`--src-width ${srcWidth} is larger than the source (${sourceSize.width}px); refusing to upscale`);
+}
+
+for (const width of options.widths) {
+  if (width > sourceSize.width) {
+    fail(`requested width ${width} is larger than the source (${sourceSize.width}px); refusing to upscale`);
+  }
+}
+
+// A width equal to srcWidth is the full-size file's job, so it is never emitted twice.
+const variantWidths = options.widths.filter((width) => width < srcWidth);
+const skipped = options.widths.filter((width) => width >= srcWidth);
+
+const outDir = resolve(options.outDir);
 await mkdir(outDir, { recursive: true });
 
-const rotation = await readRotationTag(sourcePath);
-if (rotation && rotation !== "0" && !/Rotate: 0/.test(rotation)) {
-  console.warn(
-    `warning: ${options.source} carries a rotation tag (${rotation}). Confirm the printed width/height match the upright image.`,
-  );
+const srcFile = `${options.baseName}.jpg`;
+const srcTarget = join(outDir, srcFile);
+const srcExists = await Bun.file(srcTarget).exists();
+
+if (srcExists && !options.force) {
+  const existing = await readJpegSize(srcTarget);
+  if (existing.width !== srcWidth) {
+    fail(
+      `${options.outDir}/${srcFile} already exists at ${existing.width}px but --src-width is ${srcWidth}px. ` +
+        `Re-run with --force to replace it, or omit --src-width to report its real size.`,
+    );
+  }
 }
 
 const generated: Array<{ file: string; width: number }> = [];
 
-for (const width of options.widths) {
+for (const width of variantWidths) {
   const file = `${options.baseName}-${width}.jpg`;
-  const target = join(outDir, file);
-
-  await run(["ffmpeg", "-y", "-i", sourcePath, "-vf", scaleExpression(width), "-q:v", "4", target]);
-
-  const size = await readJpegSize(target);
-  if (size.width !== width) {
-    throw new Error(`${file} is ${size.width}px wide but ${width} was requested; check for EXIF rotation`);
-  }
-
+  await run(["ffmpeg", "-y", "-nostdin", "-i", sourcePath, "-vf", scaleExpression(width), "-q:v", "4", join(outDir, file)]);
+  const size = await readJpegSize(join(outDir, file));
+  if (size.width !== width) fail(`${file} is ${size.width}px wide but ${width} was requested; check for EXIF rotation`);
   generated.push({ file, width });
 }
 
-const srcWidth = Math.max(...options.widths);
-const srcFile = `${options.baseName}.jpg`;
-const srcTarget = join(outDir, srcFile);
+await run(["ffmpeg", "-y", "-nostdin", "-i", sourcePath, "-vf", scaleExpression(srcWidth), "-q:v", "4", srcTarget]);
+const finalSrcSize = await readJpegSize(srcTarget);
+if (finalSrcSize.width !== srcWidth) fail(`${srcFile} is ${finalSrcSize.width}px wide but ${srcWidth} was requested`);
 
-await run(["ffmpeg", "-y", "-i", sourcePath, "-vf", scaleExpression(srcWidth), "-q:v", "4", srcTarget]);
-
-const srcSize = await readJpegSize(srcTarget);
+const identifier = options.constName ?? `${toCamelCase(options.baseName)}Srcset`;
+const publicPath = (file: string) => `/static/images/${file}`;
 
 console.log("");
 console.log(`// paste into imageAssetMap in src/content/site.ts`);
-console.log(`const ${options.baseName}Srcset = [`);
+console.log(`const ${identifier} = [`);
+console.log(`  "${publicPath(srcFile)} ${finalSrcSize.width}w",`);
 for (const entry of generated) {
-  console.log(`  "/static/images/${entry.file} ${entry.width}w",`);
+  console.log(`  "${publicPath(entry.file)} ${entry.width}w",`);
 }
-console.log(`  "/static/images/${srcFile} ${srcSize.width}w",`);
 console.log(`].join(", ");`);
 console.log("");
-console.log(`  src: "/static/images/${srcFile}",`);
-console.log(`  width: ${srcSize.width},`);
-console.log(`  height: ${srcSize.height},`);
+console.log(`  src: "${publicPath(srcFile)}",`);
+console.log(`  width: ${finalSrcSize.width},`);
+console.log(`  height: ${finalSrcSize.height},`);
+console.log(`  // sizes is a layout judgement — set it by hand, e.g. "(min-width: 64rem) 38rem, 92vw"`);
 console.log("");
+
+if (skipped.length > 0) {
+  console.log(`note: skipped width(s) ${skipped.join(", ")} because they are not narrower than --src-width ${srcWidth}.`);
+}
+if (!srcExists) {
+  console.log(`note: created ${options.outDir}/${srcFile}; pass --force to replace it in future runs.`);
+}
 ```
+
+Four properties this shape guarantees, each of which a review found missing:
+
+- The full-size file is written at `srcWidth`, which **equals the source's own width** unless you deliberately pass `--src-width`. Run without it, the bare `.jpg` stays the untouched native original.
+- An existing bare file at a different width is a **hard error** without `--force`, so a genuine 6000px original can never be silently replaced by a 1600px re-encode.
+- Variants are emitted only for widths **strictly below** `srcWidth`, so two entries can never share a descriptor, and the bare file is the **top** entry, matching every committed asset.
+- `toCamelCase` makes the printed identifier valid TypeScript for hyphenated base names such as `prayer-fellowship`.
 
 - [ ] **Step 4: Add the package.json script**
 
@@ -377,30 +508,38 @@ In `package.json`, insert after `"css:watch"`:
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `bun test tests/tooling.test.ts`
-Expected: PASS.
+Expected: PASS, including the three new behavioural tests.
 
 - [ ] **Step 6: Smoke-test the script end to end**
 
 Run: `bun run scripts/image-variants.ts ~/Desktop/about.jpg about-probe --widths 320,640 --out /tmp/opencode/variant-probe`
-Expected: three lines of generated-file confirmation, then a paste block naming `about-probe.jpg` at 640 with its real `width`/`height`.
+Expected: the four generated files, then a paste block whose first entry is the full-size `about-probe.jpg` at its native width, followed by the 640 and 320 rungs, and a note that `about-probe.jpg` was created. No duplicate descriptor anywhere.
 
 - [ ] **Step 7: Verify the reported dimensions are the real file's dimensions**
 
 Run: `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 /tmp/opencode/variant-probe/about-probe.jpg`
-Expected: matches the `width:` and `height:` the script printed. If it does not, the script's paste block is lying and must be fixed before Task 4 relies on it.
+Expected: matches the `width:` and `height:` the script printed. If it does not, the paste block is lying and must be fixed before Task 4 relies on it.
 
-- [ ] **Step 8: Verify the guard rejects a bad width list**
+- [ ] **Step 8: Verify the existing-file guard and the upscale guard**
 
-Run: `bun run scripts/image-variants.ts ~/Desktop/about.jpg probe --widths abc --out /tmp/opencode/variant-probe`
-Expected: a thrown `invalid width: NaN` and a non-zero exit.
+Run: `bun run scripts/image-variants.ts ~/Desktop/about.jpg about-probe --widths 320 --out /tmp/opencode/variant-probe`
+Expected: a non-zero exit with `error:` on stderr, and the existing `about-probe.jpg` untouched. Then:
 
-- [ ] **Step 9: Clean up the probe output**
+Run: `bun run scripts/image-variants.ts ~/Desktop/about.jpg up --widths 9000 --out /tmp/opencode/variant-probe`
+Expected: a non-zero exit containing `larger than the source`.
+
+- [ ] **Step 9: Verify the printed const identifier parses**
+
+Run: `bun run scripts/image-variants.ts ~/Desktop/kccf/praise\ night/DSC_0008.jpg prayer-fellowship --widths 640,1024 --out /tmp/opencode/variant-probe | rg '^const'`
+Expected: `const prayerFellowshipSrcset = [` — camelCase, not the hyphenated base name.
+
+- [ ] **Step 10: Clean up the probe output**
 
 ```bash
 rm -rf /tmp/opencode/variant-probe
 ```
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
 git add scripts/image-variants.ts package.json tests/tooling.test.ts
@@ -497,19 +636,19 @@ Regenerate any of these with:
 
 ## hero
 
-- Source: `~/Desktop/kccf/praise night/DSC_0084.jpg`
+- Source: `~/Desktop/kccf/DSC_0334.jpg`
 - Measured: YAVG 112.4, YLOW 31, YHIGH 232
 - Alt: `Congregation worshipping with hands raised during a Sunday service`
 
 ## worshipMoment
 
-- Source: `~/Desktop/kccf/praise night/DSC_0244.jpg`
+- Source: `~/Desktop/kccf/DSC_0292.jpg`
 - Measured: YAVG 118.9, YLOW 27, YHIGH 227
 - Alt: `Congregation with hands raised in worship`
 
 ## prayerFellowship
 
-- Source: `~/Desktop/kccf/praise night/DSC_0391.jpg`
+- Source: `~/Desktop/kccf/DSC_0145.jpg`
 - Measured: YAVG 105.2, YLOW 33, YHIGH 229
 - Alt: `Members of the congregation holding hands in prayer`
 
@@ -543,7 +682,7 @@ Replaces the contents of `hero`, `worshipMoment`, and `prayerFellowship` with re
 - Modify: `static/images/prayer-fellowship.jpg`, `static/images/prayer-fellowship-640.jpg`, `static/images/prayer-fellowship-1024.jpg`, `static/images/prayer-fellowship-1600.jpg`
 - Test: `tests/assets.test.ts` (**no edit** — see below), `tests/interactions.test.ts`
 
-`assets.test.ts` needs no edit. Its only hardcoded assertions are `imageAssets.hero` at `:110-114` and `imageAssets.about` at `:118-138`; both are untouched by this task. Everything else it checks — declared dimensions against real JPEG headers at `:167-175`, and each `generatedVariants` row against its real width at `:177-185` — is generic, so it passes automatically once the files and the declarations agree. That generic coverage is what makes this task's `bun test tests/assets.test.ts` a real gate rather than a rubber stamp.
+`assets.test.ts` needs **one** edit. Its hardcoded assertions at `:110-114` (hero) and `:118-138` (about) are both untouched, and the generic checks at `:167-185` pass automatically once files and declarations agree — which is what makes `bun test tests/assets.test.ts` a real gate rather than a rubber stamp. The one edit is removing the two `generatedVariants` rows for the 1600 rungs, which Step 10 deletes because the bare file becomes the 1600 entry. `--widths 640,1024 --src-width 1600` cannot emit a 1600 variant *and* a 1600 bare file without duplicating the descriptor.
 
 **Interfaces:**
 - Consumes: `docs/photo-choices.md` (Task 3), `scripts/image-variants.ts` (Task 2), the Task 1 strays deletion.
@@ -559,30 +698,28 @@ Expected: `3 fail` — the three remaining failures from Task 1 Step 7. This is 
 Run: `cat docs/photo-choices.md`
 Expected: one `## hero`, `## worshipMoment`, and `## prayerFellowship` section, each with a `Source:`, `Measured:`, and `Alt:` line, and no placeholder text. Every value this task uses comes from that file.
 
-- [ ] **Step 3: Generate the `hero` ladder from the chosen source**
+Substitute each source path from `docs/photo-choices.md`. Every command passes `--force`, because all three bare files already exist and two of them must be deliberately replaced by smaller ones.
 
-Substitute the `hero` source path from `docs/photo-choices.md`:
-
-```bash
-bun run scripts/image-variants.ts "$HOME/Desktop/kccf/praise night/DSC_0084.jpg" hero --widths 640,1024,1600 --out static/images
-```
-
-`hero` keeps its existing ladder shape — 640/1024/1600 plus a 2048w `src` — so no `srcset` string in `site.ts` or `interactions.test.ts` changes. The script's default top width is its largest requested width (1600), so produce the 2048 `src` separately:
+- [ ] **Step 3: Generate the `hero` ladder — shape unchanged**
 
 ```bash
-ffmpeg -y -i "$HOME/Desktop/kccf/praise night/DSC_0084.jpg" -vf "scale=2048:-2:flags=lanczos" -q:v 4 static/images/hero.jpg
+bun run scripts/image-variants.ts "$HOME/Desktop/kccf/DSC_0334.jpg" hero --widths 640,1024,1600 --src-width 2048 --out static/images --force
 ```
+
+This reproduces the committed `hero` shape exactly — bare file at 2048w as `src` and top ladder entry, rungs at 640/1024/1600 — so `site.ts`'s `heroSrcset` and the assertions at `assets.test.ts:109-114` and `interactions.test.ts:166-168` need **no** edit.
 
 - [ ] **Step 4: Generate the `worshipMoment` ladder at 1600**
 
 ```bash
-bun run scripts/image-variants.ts "$HOME/Desktop/kccf/praise night/DSC_0244.jpg" worship-moment --widths 640,1024,1600 --out static/images
+bun run scripts/image-variants.ts "$HOME/Desktop/kccf/DSC_0292.jpg" worship-moment --widths 640,1024 --src-width 1600 --out static/images --force
 ```
+
+`--widths` omits 1600 because the bare file *is* the 1600 rung; requesting it would emit two entries with the same descriptor. This replaces the 11.8 MB 6000×4000 original with a 1600w file.
 
 - [ ] **Step 5: Generate the `prayerFellowship` ladder at 1600**
 
 ```bash
-bun run scripts/image-variants.ts "$HOME/Desktop/kccf/praise night/DSC_0391.jpg" prayer-fellowship --widths 640,1024,1600 --out static/images
+bun run scripts/image-variants.ts "$HOME/Desktop/kccf/DSC_0145.jpg" prayer-fellowship --widths 640,1024 --src-width 1600 --out static/images --force
 ```
 
 - [ ] **Step 6: Confirm every generated file has its declared width**
@@ -600,29 +737,29 @@ Expected: each `-640` file reports 640 wide, each `-1024` reports 1024, each `-1
 
 - [ ] **Step 7: Update the three srcset literals in `site.ts`**
 
-Replace the `worshipMomentSrcset` block at `site.ts:49-54` with:
+Replace the `worshipMomentSrcset` block at `site.ts:49-54` with the block the script printed, which is the bare file first and then the narrower rungs:
 
 ```ts
 const worshipMomentSrcset = [
+  "/static/images/worship-moment.jpg 1600w",
   "/static/images/worship-moment-640.jpg 640w",
   "/static/images/worship-moment-1024.jpg 1024w",
-  "/static/images/worship-moment-1600.jpg 1600w",
-  "/static/images/worship-moment.jpg 1600w",
 ].join(", ");
 ```
 
-Replace the `prayerFellowshipSrcset` block at `site.ts:56-61` with:
+Replace the `prayerFellowshipSrcset` block at `site.ts:56-61` the same way:
 
 ```ts
 const prayerFellowshipSrcset = [
+  "/static/images/prayer-fellowship.jpg 1600w",
   "/static/images/prayer-fellowship-640.jpg 640w",
   "/static/images/prayer-fellowship-1024.jpg 1024w",
-  "/static/images/prayer-fellowship-1600.jpg 1600w",
-  "/static/images/prayer-fellowship.jpg 1600w",
 ].join(", ");
 ```
 
-Leave `heroSrcset` at `site.ts:42-47` exactly as it is.
+Leave `heroSrcset` at `site.ts:42-47` exactly as it is — `--src-width 2048` reproduces it.
+
+Note the order changed: the bare file is the **top** entry, not the last. That matches every committed asset, where the largest file leads the ladder.
 
 - [ ] **Step 8: Update the two asset declarations in `site.ts`**
 
@@ -662,7 +799,24 @@ The file is 2048×1365 but declares 800×600. Replace that line with:
   bibleStudy: { src: "/static/images/bible-study.jpg", width: 2048, height: 1365, alt: "Hands resting on an open Bible" },
 ```
 
-- [ ] **Step 10: Update the two alt-text assertions in `tests/interactions.test.ts`**
+- [ ] **Step 10: Delete the two now-redundant 1600 rung files and drop their test rows**
+
+Because Steps 4 and 5 made the bare file the 1600 rung, `worship-moment-1600.jpg` and `prayer-fellowship-1600.jpg` are no longer referenced by any srcset. They are also stale copies of the *old* stock photography, so they must not linger:
+
+```bash
+git rm static/images/worship-moment-1600.jpg static/images/prayer-fellowship-1600.jpg
+```
+
+Then remove their rows from `generatedVariants` in `tests/assets.test.ts:17-31`:
+
+```ts
+  { file: "worship-moment-1600.jpg", width: 1600 },
+  { file: "prayer-fellowship-1600.jpg", width: 1600 },
+```
+
+This is the one edit this plan needs in `assets.test.ts`, and it exists because Task 4 deliberately replaces two 6000w originals with 1600w files. Nothing else in that file changes: `:110-114` (hero) and `:118-138` (about) are untouched, and the generic checks at `:167-185` continue to pass.
+
+- [ ] **Step 11: Update the two alt-text assertions in `tests/interactions.test.ts`**
 
 At `tests/interactions.test.ts:276`, replace:
 
@@ -690,31 +844,156 @@ with the approved `prayerFellowship` alt string:
 
 The assertion at `:279` for `bibleStudy` and the assertion at `:273` for `about` are **unchanged**. The hero `src`/`srcset` assertions at `:166-168` are **unchanged**.
 
-- [ ] **Step 11: Run the assets suite to verify it is now green**
+- [ ] **Step 12: Run the assets suite to verify it is now green**
 
 Run: `bun test tests/assets.test.ts`
 Expected: PASS, zero failures. This is the gate the whole image phase was sequenced to reach.
 
-- [ ] **Step 12: Run the alt-text assertions to verify they pass**
+- [ ] **Step 13: Run the alt-text assertions to verify they pass**
 
 Run: `bun test tests/interactions.test.ts`
 Expected: PASS.
 
-- [ ] **Step 13: Run the full suite**
+- [ ] **Step 14: Run the full suite**
 
 Run: `bun test`
 Expected: every suite green. Any remaining failure names a hardcoded string this task missed; fix it here rather than deferring.
 
-- [ ] **Step 14: Confirm the size reduction**
+- [ ] **Step 15: Confirm the size reduction**
 
 Run: `du -sh static/images`
 Expected: roughly 6 MB, down from roughly 28 MB. The 10.4 MB and 11.8 MB originals are gone.
 
-- [ ] **Step 15: Commit**
+- [ ] **Step 16: Commit**
 
 ```bash
-git add static/images src/content/site.ts tests/interactions.test.ts
+git add static/images src/content/site.ts tests/assets.test.ts tests/interactions.test.ts
 git commit -m "feat: replace stock photography with church images"
+```
+
+---
+
+### Task 4b: Deliver the approved alt text and fix the footer aspect ratio
+
+Raised by the Task 4 review. The image work in Task 4 is correct and verified, but the approved alt text never reaches the four pages that display the new photographs, and a pre-existing footer bug keeps the accessibility suite red. The suite cannot go green without both.
+
+**Files:**
+- Modify: `src/components/pages/events-page.tsx:18`, `src/components/pages/leadership-page.tsx:16`, `src/components/pages/sermons-page.tsx:17`, `src/components/pages/about-page.tsx:82`, `src/components/pages/about-page.tsx:24`, `src/components/pages/ministries-page.tsx:15`, `src/components/pages/contact-page.tsx:32`
+- Modify: `src/components/site-footer.tsx:17`
+- Modify: `src/content/site.ts:49-61` (reorder the two new srcset literals)
+- Test: `tests/interactions.test.ts`
+
+**Interfaces:**
+- Consumes: the approved alt strings in `docs/photo-choices.md`, and the `worshipMomentSrcset` / `prayerFellowshipSrcset` literals written by Task 4.
+- Produces: every page rendering the asset map's `alt`; a green `tests/interactions.test.ts`; bare-file-last ordering on both new ladders.
+
+- [ ] **Step 1: Confirm the override mechanism**
+
+Run: `rg -n 'imageAlt=' src/components/pages/`
+Expected: six hits. `PageHero` resolves `imageAlt ?? imageAsset?.alt ?? ""` (`page-hero.tsx:14`), so each of these props silently overrides the asset map. The three that name their own images correctly (`about-page.tsx:24`, `ministries-page.tsx:15`, `contact-page.tsx:32`) are redundant copies of strings the asset map already holds; the other three are the stale stock text.
+
+- [ ] **Step 2: Write the failing test**
+
+Append to `tests/interactions.test.ts`:
+
+```ts
+test("no page hardcodes an alt string that the image asset map already owns", async () => {
+  const { site } = await import("../src/content/site");
+  const known = new Set(Object.values(site.imageAssets).map((asset) => asset.alt));
+
+  for (const path of ["/", "/about", "/ministries", "/sermons", "/events", "/leadership", "/contact"]) {
+    const { html } = await getPage(path);
+
+    for (const image of [...html.matchAll(/<img\b[^>]*>/g)].map((match) => match[0])) {
+      const alt = image.match(/\balt="([^"]*)"/)?.[1] ?? "";
+
+      if (alt.length > 0) {
+        expect(known.has(alt)).toBe(true);
+      }
+    }
+  }
+});
+```
+
+This asserts the invariant that makes the bug impossible to reintroduce: **every non-empty `alt` on a page must be a string the asset map owns.** Page-specific prose that differs from the image needs a genuinely new asset, not a duplicated literal.
+
+- [ ] **Step 3: Run the test to verify it fails**
+
+Run: `bun test tests/interactions.test.ts 2>&1 | tail -20`
+Expected: FAIL, naming at least `"People holding hands in prayer"` and `"Hands raised in worship"`.
+
+- [ ] **Step 4: Delete the five redundant `imageAlt` props**
+
+Remove the `imageAlt` line from each of these `PageHero` call sites:
+
+- `events-page.tsx:18`
+- `leadership-page.tsx:16`
+- `sermons-page.tsx:17`
+- `about-page.tsx:24`
+- `ministries-page.tsx:15`
+- `contact-page.tsx:32`
+
+Each page then falls through to `imageAsset.alt`. For `about-page.tsx:24` and `contact-page.tsx:32` the rendered string is unchanged (`"A cross against the sky"` is what `site.ts:83` already says), and for `ministries-page.tsx:15` it is unchanged (`"Hands resting on an open Bible"` is `site.ts:95`).
+
+- [ ] **Step 5: Fix the one bare `<img>` that has no fallback**
+
+`about-page.tsx:82` is a bare `<img>` with `getImageSource`, not a `PageHero`, so it has no automatic fallback. Replace its hardcoded `alt` with a read from the asset map. Add `getImageAsset` to that file's import from `../../content/site`:
+
+```tsx
+              {...getImageSource(site.images.worshipMoment, "(min-width: 48rem) 50vw, 92vw")}
+              alt={getImageAsset(site.images.worshipMoment)?.alt ?? ""}
+```
+
+- [ ] **Step 6: Fix the footer aspect-ratio distortion**
+
+`site-footer.tsx:17-18` renders `width={site.imageAssets.logo.width * 2}` (400) against `height` 200, on a 200×200 source — a 2:1 distortion. Display size is governed by the `w-35 h-35` classes, so the attributes exist for aspect ratio and must match the source. Change line 17 to:
+
+```tsx
+              width={site.imageAssets.logo.width}
+```
+
+- [ ] **Step 7: Reorder the two new srcset literals to bare-file-last**
+
+The repo's pre-existing convention, verified at commit `d845194` for all four ladders, is **ascending descriptors with the bare file last**. Task 4 wrote the two new ones bare-first. Reorder them in `src/content/site.ts`:
+
+```ts
+const worshipMomentSrcset = [
+  "/static/images/worship-moment-640.jpg 640w",
+  "/static/images/worship-moment-1024.jpg 1024w",
+  "/static/images/worship-moment.jpg 1600w",
+].join(", ");
+```
+
+```ts
+const prayerFellowshipSrcset = [
+  "/static/images/prayer-fellowship-640.jpg 640w",
+  "/static/images/prayer-fellowship-1024.jpg 1024w",
+  "/static/images/prayer-fellowship.jpg 1600w",
+].join(", ");
+```
+
+Leave `heroSrcset` and `aboutSrcset` untouched; `assets.test.ts:109-114` pins `hero`'s exact string.
+
+- [ ] **Step 8: Run the accessibility suite**
+
+Run: `bun test tests/interactions.test.ts`
+Expected: PASS, including the pre-existing assertions at `:273` and `:279` (`about` and `bibleStudy` alt text, unchanged) and the two Task 4 assertions at `:276` and `:282`, which now have a matching implementation.
+
+- [ ] **Step 9: Run the full suite**
+
+Run: `bun test`
+Expected: exactly **one** failure — the maintainer's `tests/browser.test.ts` `brandVisible` assertion from `ae1aef0`, which is not this plan's to fix. `assets.test.ts` and `interactions.test.ts` both green.
+
+- [ ] **Step 10: Verify no stale alt string survives anywhere**
+
+Run: `rg -n 'People holding hands in prayer|Hands raised in worship' src/ docs/photo-choices.md`
+Expected: no hits in `src/`. The only permitted mention is `docs/photo-choices.md`, which records the old string as the falsehood it replaced.
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add src/components/pages src/components/site-footer.tsx src/content/site.ts tests/interactions.test.ts
+git commit -m "fix: deliver approved alt text and correct footer logo aspect ratio"
 ```
 
 ---
@@ -846,7 +1125,7 @@ Replace the `intentionally has no featured events yet` test at `:87-89` with:
     const dates = pastEvents.map((event) => event.date);
     expect(dates).toEqual([
       "September 20, 2026",
-      "September 20, 2025",
+      "September 21, 2025",
       "September 19, 2025",
       "July 20, 2025",
       "June 1, 2025",
@@ -904,7 +1183,7 @@ export const events: ChurchEvent[] = [
   {
     status: "past",
     title: "Thanksgiving Anniversary",
-    date: "September 20, 2025",
+    date: "September 21, 2025",
     location: "KCCF Mount Zion, Ikotun, Lagos",
     description: "The church gave thanks together for another year of ministry, worship, and community.",
   },
@@ -1411,7 +1690,15 @@ Extend the existing bullet at `CLAUDE.md:40`:
 - `src/content/site.ts` owns image metadata. Add `srcset`/`sizes` to the asset and resolve them with `getImageSource(src, sizes?)` rather than hardcoding paths in a component. For each asset, `src` is the **largest local file for that asset** and is itself the top `srcset` entry; `tests/assets.test.ts` pins this for `hero` and `about`. Never ship a full-resolution original as a `src` when a 1600w derivative is available — a 6000×4000 original is over 10 MB. Generate ladders with `bun run scripts/image-variants.ts <source> <base-name>`, which prints the paste-ready `srcset` literal and the real `width`/`height` read back from the generated files.
 ```
 
-- [ ] **Step 9: Update the route description in `README.md`**
+- [ ] **Step 9: Document `image:variants` in `CLAUDE.md`**
+
+The Task 2 review flagged that the new script is undocumented. Extend the `scripts/dev.ts` bullet in the Architecture section:
+
+```markdown
+- `scripts/image-variants.ts` regenerates image width ladders with the system `ffmpeg` and prints a paste-ready `srcset` literal plus the real `width`/`height` read back off disk. It is the only sanctioned way to change an image ladder: `tests/assets.test.ts` compares declared dimensions against real JPEG header bytes, so a hand-written guess fails there. For each asset the bare `<name>.jpg` is the largest local file and leads the ladder, so request only widths narrower than `--src-width`; an existing bare file at a different width is a hard error unless you pass `--force`. It refuses to upscale.
+```
+
+- [ ] **Step 10: Update the route description in `README.md`**
 
 Replace the `/events` line at `README.md:25`:
 
@@ -1419,12 +1706,12 @@ Replace the `/events` line at `README.md:25`:
 - `/events` - Weekly services, the monthly Transformation Night, upcoming events, and past events
 ```
 
-- [ ] **Step 10: Run the full gate again after the doc edits**
+- [ ] **Step 11: Run the full gate again after the doc edits**
 
 Run: `bun run check`
 Expected: PASS.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add src/input.css static/style.css tests/stylesheet.test.ts CLAUDE.md README.md
@@ -1446,7 +1733,7 @@ git status --short
 
 Expected:
 
-- `bun run check` exits 0 across `type-check`, `css:build`, `test`, and `build`.
+- `bun run check` exits 0 across `type-check`, `css:build`, and `build`; `test` reports exactly **one** failure, the maintainer's `brandVisible` browser assertion described in Global Constraints. Zero other failures.
 - `du -sh static/images` is roughly 6 MB, down from roughly 28 MB.
 - `git status --short` is empty, so no stray was left untracked by Tasks 1 or 4.
 
@@ -1462,7 +1749,7 @@ Expected on `/events`: all five strings present. Expected on `/`: `Upcoming Even
 
 ## Notes for the executor
 
-- **The working tree starts dirty.** It carries uncommitted image deletions and additions from an abandoned rename. Task 1 resolves the `prayer-fellowship` part; `bible-study.jpg`, `src/input.css`, `src/components/site-*.tsx`, and `static/style.css` also show as modified. Inspect `git diff` for any file a task touches before staging it, and stage only the paths each task names. Never `git add -A`.
+- **The working tree is clean and the maintainer's in-progress work is already committed** as of `ae1aef0`. It contains their `.header-offset` padding tweak, the `SectionHeading` eyebrow colour, `site.images.logo`, a real `bible-study.jpg` at 2048x1365, and the broken `prayer-fellowship` image state. Build on top of it; do not revert it. Stage only the paths each task names.
 - **Two tasks are deliberately red between steps.** Task 1 ends with three `assets.test.ts` failures, closed by Task 4. Task 5 ends with `type-check` failing on two sites, closed by Task 6. Neither is a mistake; do not "fix" them early, because Task 4 regenerates the files from the chosen photograph and Task 6 rewrites the array.
 - **Task 3 blocks on a human.** Stop and ask. Choosing photographs of a real congregation is the maintainer's decision, not the executor's.
 - **No placeholder text anywhere.** Task 3 commits the maintainer's real choices to `docs/photo-choices.md`, and Task 4 reads its source paths and alt strings from that file. If any value is still missing at Task 4 Step 2, stop and resolve it with the maintainer — never invent a filename, an alt string, or a measurement.

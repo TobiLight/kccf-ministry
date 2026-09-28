@@ -196,6 +196,9 @@
   .absolute {
     position: absolute;
   }
+  .fixed {
+    position: fixed;
+  }
   .relative {
     position: relative;
   }
@@ -222,6 +225,9 @@
   }
   .block {
     display: block;
+  }
+  .contents {
+    display: contents;
   }
   .flex {
     display: flex;
@@ -265,6 +271,9 @@
   .animate-soft-bounce {
     animation: var(--animate-soft-bounce);
   }
+  .flex-wrap {
+    flex-wrap: wrap;
+  }
   .rounded-full {
     border-radius: calc(infinity * 1px);
   }
@@ -293,6 +302,13 @@
   }
   .text-white\! {
     color: var(--color-white) !important;
+  }
+  .uppercase {
+    text-transform: uppercase;
+  }
+  .outline {
+    outline-style: var(--tw-outline-style);
+    outline-width: 1px;
   }
   .filter {
     filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,);
@@ -1408,6 +1424,20 @@ section {
   font-size: 0.85rem;
   font-weight: 700;
 }
+.past-event-card {
+  border-color: var(--color-warm-border);
+  box-shadow: none;
+}
+.past-event-card .card-content .eyebrow {
+  color: var(--color-muted-foreground);
+}
+.past-event-card:hover {
+  transform: none;
+  box-shadow: none;
+}
+.event-recap {
+  font-size: 0.95rem;
+}
 .empty-state-large {
   padding-block: 3rem;
 }
@@ -1759,6 +1789,11 @@ section {
   inherits: false;
   initial-value: solid;
 }
+@property --tw-outline-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
 @property --tw-blur {
   syntax: "*";
   inherits: false;
@@ -1835,6 +1870,7 @@ section {
       --tw-skew-x: initial;
       --tw-skew-y: initial;
       --tw-border-style: solid;
+      --tw-outline-style: solid;
       --tw-blur: initial;
       --tw-brightness: initial;
       --tw-contrast: initial;

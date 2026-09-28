@@ -1,10 +1,20 @@
 import { ButtonLink } from "../ui/button-link";
-import { getImageSource } from "../../content/site";
+import { getImageAsset, getImageSource } from "../../content/site";
 import { Card } from "../ui/card";
 import { PageHero } from "../ui/page-hero";
 import { SectionHeading } from "../ui/section-heading";
 import { leadership } from "../../content/leadership";
 import { site } from "../../content/site";
+
+// A missing entry is a content-map error, not an absent value: an empty alt would
+// quietly drop the description instead of failing where it was introduced.
+function requireImageAsset(src: string) {
+  const asset = getImageAsset(src);
+  if (!asset) throw new Error(`imageAssetMap has no entry for ${src}`);
+  return asset;
+}
+
+const worshipMomentAsset = requireImageAsset(site.images.worshipMoment);
 
 const beliefs = [
   { title: "The Bible", text: "We believe Biblical truth is trustworthy and the foundation of faith and life." },
@@ -21,7 +31,6 @@ export function AboutPage() {
         title="About KCCF"
         description="A Covenant Community Rooted in Christ, gathering in Lagos to worship, serve, and grow together."
         image={site.images.about}
-        imageAlt="A cross against the sky"
       />
 
       <section class="calling-section section-cream" aria-labelledby="calling-title">
@@ -80,7 +89,7 @@ export function AboutPage() {
             <img
               class="editorial-image"
               {...getImageSource(site.images.worshipMoment, "(min-width: 48rem) 50vw, 92vw")}
-              alt="Hands raised in worship"
+              alt={worshipMomentAsset.alt}
               loading="lazy"
             />
             <div class="image-caption">Rooted in grace</div>

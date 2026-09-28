@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "../src/index";
-import { imageAssets } from "../src/content/site";
+import { getImageAsset, imageAssets } from "../src/content/site";
 
 async function getPage(path: string) {
   const response = await createApp().request(path);
@@ -273,13 +273,13 @@ describe("rendered accessibility contract", () => {
         expect(html).toContain('alt="A cross against the sky"');
       }
       if (path === "/") {
-        expect(html).toContain('alt="Congregation"');
+        expect(html).toContain('alt="Congregation standing together during a Sunday service"');
       }
       if (path === "/ministries") {
         expect(html).toContain('alt="Hands resting on an open Bible"');
       }
       if (path === "/events") {
-        expect(html).toContain('alt="People holding hands in prayer"');
+        expect(html).toContain('alt="A member of the congregation greeting children during a church service"');
       }
       if (path === "/" || path === "/about" || path === "/contact") {
         expect(html).toContain('fetchpriority="high"');
@@ -291,5 +291,23 @@ describe("rendered accessibility contract", () => {
     const response = await createApp().request("/contact", { method: "POST" });
 
     expect(response.status).toBe(404);
+  });
+
+  test("every rendered alt is the asset map's own alt for that image's src", async () => {
+    for (const path of ["/", "/about", "/ministries", "/sermons", "/events", "/leadership", "/contact"]) {
+      const { html } = await getPage(path);
+
+      for (const image of [...html.matchAll(/<img\b[^>]*>/g)].map((match) => match[0])) {
+        const src = image.match(/\bsrc="([^"]*)"/)?.[1];
+        const alt = image.match(/\balt="([^"]*)"/)?.[1] ?? "";
+        const asset = src ? getImageAsset(src) : undefined;
+
+        if (alt.length > 0 && asset) {
+          expect(alt, `${path} pairs the wrong alt with ${src}`).toBe(asset.alt);
+        } else if (alt.length > 0) {
+          expect(asset, `${path} renders alt text on an unrecognised src ${src}`).toBeDefined();
+        }
+      }
+    }
   });
 });

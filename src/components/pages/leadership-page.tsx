@@ -13,7 +13,6 @@ export function LeadershipPage() {
         title="Our Leadership"
         description="Our leaders shepherd with wisdom, prayer, and a sincere love for people."
         image={site.images.prayerFellowship}
-        imageAlt="People holding hands in prayer"
       />
 
       <section class="pastoral-section section-cream" aria-labelledby="pastoral-section-title">

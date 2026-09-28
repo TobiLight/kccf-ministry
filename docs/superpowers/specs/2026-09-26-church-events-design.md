@@ -130,7 +130,16 @@ EXIF `DateTimeOriginal` timestamps, read via
 | Youth | 2025-07-18 / 2025-07-19 | 63 / 66 |
 | usher | 2025-07-06 | 112 |
 | praise night | 2025-09-19 / 2025-09-20 | 87 / 26 |
-| root (loose) | 2025-09-21, 2024-09-14/15, 2026-08-29 | 80 / 18 / 6 / 7 |
+| root (loose) | **2025-09-21**, 2024-09-14/15, 2026-08-29 | 80 / 18 / 6 / 7 |
+
+**Corrected after EXIF screening.** The `praise night` folder is one continuous session running
+from 2025-09-19 22:40 to 2025-09-20 03:43 — a single Friday-night service spanning midnight, not
+two gatherings. The 80 frames dated 2025-09-21 in the root folder are the **Sunday** service, and
+2025-09-21 was a Sunday whereas 2026-09-20 is also a Sunday, consistent with an annual event
+whose weekday drifts by one each year. So the 2025 Thanksgiving Anniversary is **21 September
+2025**, not 20 September, and the earlier reading that drew it from `praise night`'s 09-20
+frames was wrong. Praise Night (Friday 19 September 2025) and the Anniversary (Sunday
+21 September 2025) are two days apart, and both have photographs.
 
 **No photographs exist from 2026-09-20.** The only 2026 images are seven from 2026-08-29
 (`JBD_*.jpg`, a second camera body). This is why event imagery was dropped (§3) rather
@@ -156,7 +165,9 @@ may be used in event copy. It also implies the first anniversary was 2009.
 
 ### 4.7 Tooling
 
-`ffmpeg` 6.1.1 and `bun` 1.3.14 are installed. `package.json` has **no** image toolchain —
+`ffmpeg` 6.1.1 and `bun` 1.3.14 are installed. `signalstats` reports `YMIN`/`YMAX` as the
+extreme luma values and `YLOW`/`YHIGH` as interior percentiles, so the screening thresholds in
+§10.3 are applied to the percentiles, not to the extremes. `package.json` has **no** image toolchain —
 no `sharp`, no `imagemin` — and the existing variants were produced out of band. Adding
 `scripts/image-variants.ts` (§9) makes the process reproducible without adding a
 dependency, consistent with the "keep it dependency-free" rule that governs
@@ -252,15 +263,16 @@ the existing convention in `sermons.ts`, which is also hand-ordered with no `.so
 | # | Title | Date | Recap |
 |---|---|---|---|
 | 1 | Annual Church Thanksgiving Anniversary | September 20, 2026 | 18th anniversary; theme *Harvest of Abundance* |
-| 2 | Thanksgiving Anniversary | September 20, 2025 | — |
+| 2 | Thanksgiving Anniversary | September 21, 2025 | — |
 | 3 | Praise Night | September 19, 2025 | — |
 | 4 | Youth Thanksgiving Service: Light of the World | July 20, 2025 | — |
 | 5 | Children's Anniversary | June 1, 2025 | — |
 
 Dates are from the maintainer for the 2026 anniversary and from EXIF capture dates for the
-2025 events (§4.4). `praise night` contains photographs from both 2025-09-19 and
-2025-09-20; they are treated as two distinct gatherings — a Friday-night praise service
-before a Sunday anniversary service. **This reading is unconfirmed** (§13, item 1).
+2025 events. Praise Night is a Friday-night service on 2025-09-19; the 2025 Thanksgiving
+Anniversary is the Sunday service on 2025-09-21, whose 80 photographs sit in the root folder
+rather than in `praise night`. Both readings are confirmed by EXIF, which **resolves** the
+open question raised in §13 item 1.
 
 **Recap copy is deliberately absent for events 2–5.** The only grounded detail available is
 the 2026 theme (§4.6). Inventing attendance figures, speakers, or quotations for real
@@ -516,9 +528,9 @@ breakpoint.
 
 None of these block implementation; the build is verifiable without them.
 
-1. **Praise Night vs the 2025 Anniversary.** Treated as two gatherings one day apart
-   (2025-09-19 and 2025-09-20) because the photographs split cleanly on that date. Merge
-   them if they were one event.
+1. **RESOLVED — Praise Night vs the 2025 Anniversary.** Confirmed by EXIF as two gatherings two
+   days apart: a Friday-night service on 2025-09-19 and a Sunday anniversary service on
+   2025-09-21. Not merged. The 2026 anniversary remains photograph-free.
 2. **Event copy.** Recap lines and richer descriptions for all nine events. Only the 2026
    theme (*Harvest of Abundance*) is grounded in observed data (§4.6).
 3. **Specific future dates.** Carol Service and I AM Revival have none; Women's Anniversary

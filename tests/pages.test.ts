@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "../src/index";
+import { events, pastEvents, upcomingEvents } from "../src/content/events";
 import { site } from "../src/content/site";
 import { canonicalAddress } from "./content.test";
+
+const renderedPastTitles = pastEvents.map((event) => event.title.replace(/'/g, "&#39;"));
 
 async function getPage(path: string) {
   const response = await createApp().request(path);
@@ -44,9 +47,27 @@ describe("home page", () => {
     expect(html).toContain("Bible Study");
     expect(html).toContain("Bishop Olayinka Adeyinka");
     expect(html).toContain("Pastor David Bodunrin");
-    expect(html).toContain("No upcoming events");
+    expect(html).toContain("I AM Revival");
+    expect(html).toContain("Carol Service");
+    expect(html).not.toContain("No upcoming events");
     expect(html).toContain("href=\"/contact\"");
     expect(html).toContain("href=\"/sermons\"");
+  });
+
+  test("shows only upcoming events in the home teaser, capped at three", async () => {
+    const { html, main } = await getPage("/");
+
+    expect(html).toContain("Upcoming Events");
+    expect(html).toContain("Carol Service");
+    expect(html).not.toContain("Past Events");
+    // No past event may reach the teaser, whichever one is swapped in.
+    for (const title of renderedPastTitles) {
+      expect(html).not.toContain(title);
+    }
+    // The fourth upcoming event is the ceiling: it must not reach the teaser.
+    expect(html).not.toContain("Christmas Service");
+    expect((html.match(/class="card event-card"/g) ?? [])).toHaveLength(3);
+    expect(main).not.toMatch(/·\s*<\/p>/);
   });
 });
 
@@ -120,13 +141,71 @@ describe("sermons page", () => {
 });
 
 describe("events page", () => {
-  test("renders regular services, the featured empty state, and contact CTA", async () => {
+  test("renders regular services, upcoming events, and past events in order", async () => {
     const { html, main } = await getPage("/events");
 
-    expectInOrder(main, ["Events", "Sunday Worship", "Wednesday Throne of Grace", "Transformation Night", "Featured Events", "No upcoming events", "Contact Us"]);
+    // Titles containing an apostrophe are matched as the entity the renderer emits.
+    expectInOrder(main, [
+      "Events",
+      "Sunday Worship",
+      "Wednesday Throne of Grace",
+      "Transformation Night",
+      "Upcoming Events",
+      "I AM Revival",
+      "Women&#39;s Anniversary",
+      "Christmas Service",
+      "Past Events",
+    ]);
     expect(html).toContain("Every 1st Thursday Transformation Night");
     expect(html).toContain("10:00 PM");
     expect(html).not.toContain("Weekly gathering");
+  });
+
+  test("renders every past event only after the past section boundary", async () => {
+    const { html } = await getPage("/events");
+    const boundary = html.indexOf('id="past-events-title"');
+
+    expect(boundary).toBeGreaterThan(-1);
+    for (const title of renderedPastTitles) {
+      expect(html.indexOf(title)).toBeGreaterThan(boundary);
+    }
+  });
+
+  test("labels unannounced dates as a standalone eyebrow and never renders a dangling separator", async () => {
+    const { html, main } = await getPage("/events");
+
+    // Catches `{event.date} · {event.time}`, which JSX renders as a bare or trailing "·".
+    // Checked first: this failure is compact, the next one dumps the whole document.
+    expect(main).not.toMatch(/·\s*<\/p>/);
+    // A schedule label is its own paragraph, so the `</p>` must close it directly.
+    // A bare substring is not enough: "Date to be announced" also occurs in body copy.
+    expect(html).toContain('<p class="eyebrow">Date to be announced</p>');
+    // Catches any direct date or time interpolation that skips formatEventSchedule,
+    // which is how a date-only event would render a literal "undefined" separator.
+    expect(main).not.toContain("undefined");
+  });
+
+  test("renders event cards through the shared Card component", async () => {
+    const { html } = await getPage("/events");
+
+    expect(html).toContain('class="card event-card"');
+    expect(html).toContain('class="card past-event-card"');
+    expect(html).not.toContain('class="event-card"');
+  });
+
+  test("gives the past events section a resolvable unique heading id", async () => {
+    const { html } = await getPage("/events");
+
+    expect(html).toContain('aria-labelledby="past-events-title"');
+    expect(html).toContain('id="past-events-title"');
+  });
+
+  test("renders a location on every event card and a recap only where one is authored", async () => {
+    const { html } = await getPage("/events");
+
+    expect((html.match(/<p class="event-location">/g) ?? [])).toHaveLength(9);
+    expect((html.match(/<p class="event-recap">/g) ?? [])).toHaveLength(1);
+    expect(html).toContain('<p class="event-recap">The service carried the theme Harvest of Abundance.</p>');
   });
 });
 
@@ -138,7 +217,7 @@ describe("leadership page", () => {
       "Our Leadership",
       "General Overseer",
       "Bishop Olayinka Adeyinka",
-      "Co-Pastor",
+      "Resident Pastor",
       "Pastor David Bodunrin",
       "Ministry Leaders",
       "Worship Director",
@@ -146,7 +225,7 @@ describe("leadership page", () => {
       "Get in Touch",
     ]);
     expect((html.match(/<article class="pastoral-card"/g) ?? [])).toHaveLength(2);
-    expect((html.match(/<article class="leadership-card"/g) ?? [])).toHaveLength(5);
+    expect((html.match(/<article class="leadership-card"/g) ?? [])).toHaveLength(6);
     expect(html).toContain("biblical truth");
     expect(html).toContain("pastoral care");
     expect(html).toContain("pastor-1.jpg");
@@ -157,7 +236,7 @@ describe("leadership page", () => {
     const { html } = await getPage("/leadership");
     const leaderImages = [...html.matchAll(/<img[^>]*class="leadership-card-image"[^>]*>/g)].map((match) => match[0]);
 
-    expect(leaderImages).toHaveLength(5);
+    expect(leaderImages).toHaveLength(6);
     for (const image of leaderImages) {
       const alt = image.match(/alt="([^"]*)"/)?.[1];
       expect(alt).toBeTruthy();

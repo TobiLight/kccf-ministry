@@ -29,7 +29,6 @@ export function ContactPage() {
         title="Contact KCCF"
         description="Have a question, want to visit, or simply want to say hello? We would be glad to hear from you."
         image={site.images.about}
-        imageAlt="A cross against the sky"
       />
 
       <section class="contact-details-section section-cream" aria-labelledby="contact-details-title">
