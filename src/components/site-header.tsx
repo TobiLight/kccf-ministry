@@ -49,7 +49,7 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
             <img
               class="brand-logo-image"
               src={site.imageAssets.logo.src}
-              alt="KCCF Ministries"
+              alt={site.imageAssets.logo.alt}
               width={site.imageAssets.logo.width}
               height={site.imageAssets.logo.height}
             />

@@ -25,7 +25,7 @@ function toCamelCase(value: string) {
 function parseArgs(argv: string[]): Options {
   const positional: string[] = [];
   let widths = DEFAULT_WIDTHS;
-  let outDir = "static/images";
+  let outDir = "public/static/images";
   let srcWidth: number | undefined;
   let force = false;
   let constName: string | undefined;
@@ -79,7 +79,7 @@ function parseArgs(argv: string[]): Options {
 
   const [source, baseName] = positional;
   if (!source || !baseName) {
-    fail("usage: image-variants <source> <base-name> [--widths 640,1024,1600] [--out static/images] [--src-width N] [--const-name name] [--force]");
+    fail("usage: image-variants <source> <base-name> [--widths 640,1024,1600] [--out public/static/images] [--src-width N] [--const-name name] [--force]");
   }
 
   // A repeated width would emit a duplicate descriptor, which a pasted srcset
@@ -178,7 +178,7 @@ if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(identifier)) {
   fail(`"${identifier}" is not a valid JavaScript identifier; pass --const-name with a valid name`);
 }
 
-// static/ is served from the project root, so a --out inside the project has a real
+// public/ is served from the project root, so a --out inside the project has a real
 // public path. A --out outside it has no URL yet, so fall back to the intended
 // destination and say loudly that the files are not there.
 const relativeOut = relative(resolve(import.meta.dir, ".."), outDir);
@@ -189,7 +189,7 @@ const publicPath = (file: string) => `${servedDir}/${file}`;
 if (!servable) {
   console.warn(
     `warning: --out ${options.outDir} is outside the project, so nothing is served at the paths below. ` +
-      `Move the files into static/images before pasting this block.`,
+      `Move the files into public/static/images before pasting this block.`,
   );
 }
 

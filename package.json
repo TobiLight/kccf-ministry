@@ -9,10 +9,9 @@
     "start": "bun run dist/index.js",
     "test": "bun test",
     "type-check": "bunx tsc --noEmit",
-    "css:build": "bunx @tailwindcss/cli -i src/input.css -o static/style.css",
-    "css:watch": "bunx @tailwindcss/cli -i src/input.css -o static/style.css --watch=always",
+    "css:build": "bunx @tailwindcss/cli -i src/input.css -o public/static/style.css",
+    "css:watch": "bunx @tailwindcss/cli -i src/input.css -o public/static/style.css --watch=always",
     "image:variants": "bun run scripts/image-variants.ts",
-    "vercel:prepare": "bun run scripts/prepare-public.ts",
     "sermons:sync": "bun run scripts/sync-sermons.ts",
     "check": "bun run type-check && bun run css:build && bun run test && bun run build"
   },

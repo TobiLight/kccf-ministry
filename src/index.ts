@@ -29,7 +29,10 @@ export function createApp(): Hono {
     }),
   );
 
-  app.use("/static/*", serveStatic({ root: "./" }));
+  // Hono joins this root with the request path, so "/static/*" resolves under
+  // public/static. That is the same tree Vercel serves from its CDN, and it is the
+  // only one there: Vercel ignores serveStatic entirely.
+  app.use("/static/*", serveStatic({ root: "./public" }));
 
   return configureRoutes(app);
 }

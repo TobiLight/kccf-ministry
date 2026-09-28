@@ -1,5 +1,5 @@
 const watchers = [
-  { label: "css", command: ["bunx", "@tailwindcss/cli", "-i", "src/input.css", "-o", "static/style.css", "--watch=always"] },
+  { label: "css", command: ["bunx", "@tailwindcss/cli", "-i", "src/input.css", "-o", "public/static/style.css", "--watch=always"] },
   { label: "server", command: ["bun", "run", "--watch", "src/index.ts"] },
 ] as const;
 

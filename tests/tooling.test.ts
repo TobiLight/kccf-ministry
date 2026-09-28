@@ -33,7 +33,7 @@ describe("development supervision", () => {
     expect(supervisor).toContain("@tailwindcss/cli");
     expect(supervisor).toContain("--watch=always");
     expect(supervisor).toContain("src/input.css");
-    expect(supervisor).toContain("static/style.css");
+    expect(supervisor).toContain("public/static/style.css");
     expect(supervisor).toContain('"bun", "run", "--watch", "src/index.ts"');
     expect(supervisor).not.toMatch(/^import /m);
   });
@@ -61,7 +61,7 @@ describe("development supervision", () => {
     expect(dockerfile).toContain("COPY scripts ./scripts");
     expect(compose).toContain('command: ["bun", "run", "scripts/dev.ts"]');
     expect(compose).toContain("./src:/app/src");
-    expect(compose).toContain("./static:/app/static");
+    expect(compose).toContain("./public:/app/public");
     expect(compose).toContain("node_modules:/app/node_modules");
   });
 
@@ -128,6 +128,7 @@ type VercelConfig = {
   installCommand?: string;
   regions?: string[];
   buildCommand?: string;
+  outputDirectory?: string;
   headers?: { source: string; headers: { key: string; value: string }[] }[];
 };
 
@@ -141,32 +142,59 @@ function cacheControl(config: VercelConfig, source: string) {
 }
 
 describe("vercel deployment", () => {
-  test("pins the function runtime to the same Bun version the container image uses", async () => {
+  test("overrides no build command or output directory, because Vercel builds Hono itself", async () => {
+    const config = await readVercelConfig();
+
+    // Vercel detects Hono from src/index.ts and runs its own build. Overriding buildCommand
+    // replaces that build with an arbitrary command, after which Vercel falls back to a
+    // generic static build that looks for its default output directory - and the deployment
+    // fails with 'No Output Directory named "dist" found after the Build completed'. The
+    // zero-config path takes no build command and no output directory at all.
+    expect(config.buildCommand).toBeUndefined();
+    expect(config.outputDirectory).toBeUndefined();
+  });
+
+  test("serves the assets from a committed public/ tree, so no build step is needed", async () => {
+    const manifest = JSON.parse(await readProjectFile("package.json")) as { scripts: Record<string, string> };
+
+    // Every asset a visitor loads is committed under public/static, including the compiled
+    // stylesheet, so there is genuinely nothing for a Vercel build to produce.
+    expect(manifest.scripts["css:build"]).toBe("bunx @tailwindcss/cli -i src/input.css -o public/static/style.css");
+    expect(manifest.scripts).not.toHaveProperty("vercel:prepare");
+
+    for (const asset of ["public/static/style.css", "public/static/datastar.js", "public/static/favicon.svg"]) {
+      expect(await Bun.file(new URL(`../${asset}`, import.meta.url)).exists(), `${asset} must be committed`).toBe(true);
+    }
+  });
+
+  test("keeps the same public/ tree that Hono serves locally and in the container", async () => {
+    const dockerfile = await readProjectFile("Dockerfile");
+    const compose = await readProjectFile("docker-compose.yml");
+
+    // One directory for both targets: Vercel's CDN serves public/static from the project root,
+    // and Hono's serveStatic resolves /static/* against the same tree everywhere else.
+    expect(dockerfile).toContain("COPY public ./public");
+    expect(dockerfile).toContain("COPY --from=build /app/public ./public");
+    expect(compose).toContain("./public:/app/public");
+    expect(await readProjectFile(".gitignore")).not.toMatch(/^public\/$/m);
+  });
+
+  test("requests the same Bun major version the container image uses", async () => {
     const config = await readVercelConfig();
     const dockerfile = await readProjectFile("Dockerfile");
     const imageVersion = dockerfile.match(/^FROM oven\/bun:([\d.]+)-alpine AS base$/m)?.[1];
 
     expect(imageVersion, "the Dockerfile must pin an oven/bun base image this test can read").toBeTruthy();
-    expect(config.bunVersion).toBe(imageVersion);
-    // The container and the function are separate deployments; a silent version skew is the
-    // failure mode here, and nothing else in the build would catch it.
+    // Vercel manages the minor and patch versions, so only the major is expressible here.
+    // The container and the function are separate deployments, and a silent major skew is the
+    // failure mode - nothing else in the build would catch it.
+    expect(config.bunVersion).toBe(`${imageVersion!.split(".")[0]}.x`);
   });
 
   test("installs from the lockfile rather than letting the platform resolve versions", async () => {
     const config = await readVercelConfig();
 
     expect(config.installCommand).toBe("bun install --frozen-lockfile");
-  });
-
-  test("builds CSS and mirrors the static tree instead of bundling for the server", async () => {
-    const config = await readVercelConfig();
-
-    // Vercel bundles the function from src/index.ts itself, so the package.json build script
-    // produces a dist/ that nothing on Vercel runs. The real build work is the stylesheet and
-    // the public/ mirror, and dropping either one deploys a site with no CSS or no JavaScript.
-    expect(config.buildCommand).toContain("css:build");
-    expect(config.buildCommand).toContain("scripts/prepare-public.ts");
-    expect(config.buildCommand).not.toContain("bun build");
   });
 
   test("caches the images at the edge but always revalidates the stylesheet and the runtime", async () => {
@@ -179,29 +207,18 @@ describe("vercel deployment", () => {
     expect(stylesheet).toBe("public, max-age=0, must-revalidate");
     expect(runtime).toBe("public, max-age=0, must-revalidate");
 
-    // style.css is regenerated on every deploy, and the image filenames are not
-    // content-addressed, so neither may be pinned immutable.
+    // style.css is recompiled from src/input.css and committed, and the image filenames are
+    // not content-addressed, so neither may be pinned immutable.
     expect(stylesheet).not.toContain("immutable");
     expect(images).not.toContain("immutable");
   });
 
-  test("keeps the generated mirror and the local Vercel state out of git and the build context", async () => {
+  test("keeps the local Vercel state out of git and the build context", async () => {
     const gitignore = await readProjectFile(".gitignore");
     const dockerignore = await readProjectFile(".dockerignore");
 
-    expect(gitignore).toMatch(/^public\/$/m);
     expect(gitignore).toMatch(/^\.vercel\/$/m);
-    expect(dockerignore).toMatch(/^public$/m);
     expect(dockerignore).toMatch(/^\.vercel$/m);
-  });
-
-  test("keeps static/ the single source of truth for the /static/ URL prefix", async () => {
-    const dockerfile = await readProjectFile("Dockerfile");
-
-    // Vercel serves the mirror from public/ while Hono serves static/ everywhere else, so the
-    // two must keep the same prefix. The mirror is what stops that from silently diverging.
-    expect(dockerfile).toContain("COPY static ./static");
-    expect(await readProjectFile(".gitignore")).not.toMatch(/^static\/$/m);
   });
 
   test("exposes the default export Vercel runs, with the fetch handler it reads", async () => {
@@ -211,57 +228,6 @@ describe("vercel deployment", () => {
     // port is Bun's own server hint and is ignored off-platform.
     expect(typeof entry.default.fetch).toBe("function");
     expect(await entry.default.fetch(new Request("https://example.test/health"))).toBeInstanceOf(Response);
-  });
-});
-
-describe("vercel static mirror", () => {
-  const workDir = "/tmp/opencode/prepare-public-test";
-
-  test("mirrors the source tree exactly, including nested directories", async () => {
-    await run(`rm -rf ${workDir} && mkdir -p ${workDir}/src/images`);
-    await run(`printf 'body{}' > ${workDir}/src/style.css && printf 'export default {};' > ${workDir}/src/datastar.js`);
-    await run(`printf 'jpegbytes' > ${workDir}/src/images/hero-640.jpg`);
-
-    const proc = Bun.spawn(["bun", "run", "scripts/prepare-public.ts", "--src", `${workDir}/src`, "--out", `${workDir}/out`], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const stdout = await new Response(proc.stdout).text();
-    expect(await proc.exited, await new Response(proc.stderr).text()).toBe(0);
-
-    expect(await Bun.file(`${workDir}/out/static/style.css`).text()).toBe("body{}");
-    expect(await Bun.file(`${workDir}/out/static/datastar.js`).text()).toBe("export default {};");
-    expect(await Bun.file(`${workDir}/out/static/images/hero-640.jpg`).text()).toBe("jpegbytes");
-    expect(stdout).toContain("3 files");
-  });
-
-  test("wipes the destination first so a deleted asset cannot survive as a stale CDN file", async () => {
-    await run(`rm -rf ${workDir} && mkdir -p ${workDir}/out/static/images`);
-    await run(`printf 'stale' > ${workDir}/out/static/images/removed.jpg`);
-
-    const proc = Bun.spawn(["bun", "run", "scripts/prepare-public.ts", "--src", "static", "--out", `${workDir}/out`], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    await new Response(proc.stdout).text();
-    expect(await proc.exited, await new Response(proc.stderr).text()).toBe(0);
-
-    expect(await Bun.file(`${workDir}/out/static/images/removed.jpg`).exists()).toBe(false);
-    expect(await Bun.file(`${workDir}/out/static/style.css`).exists()).toBe(true);
-  });
-
-  test("aborts rather than deploying a mirror of nothing", async () => {
-    const proc = Bun.spawn(["bun", "run", "scripts/prepare-public.ts", "--src", "static/absent", "--out", `${workDir}/out`], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const stderr = await new Response(proc.stderr).text();
-
-    expect(await proc.exited).not.toBe(0);
-    expect(stderr).toContain("not found");
-    // A silent no-op would publish a site with no stylesheet and no Datastar runtime, which
-    // still renders but loses every interaction - the failure mode nothing else would catch.
-    expect(await Bun.file(`${workDir}/out/static`).exists()).toBe(false);
   });
 });
 
@@ -289,7 +255,7 @@ describe.skipIf(!hasFfmpeg)("image variant generator", () => {
 
   test("prints the srcset and real dimensions, and never touches an existing full-size file", async () => {
     await run("rm -rf " + workDir + " && mkdir -p " + workDir + "/seed");
-    await run(`ffmpeg -y -i static/images/hero.jpg -vf scale=2048:-2 ${workDir}/seed/probe.jpg`);
+    await run(`ffmpeg -y -i public/static/images/hero.jpg -vf scale=2048:-2 ${workDir}/seed/probe.jpg`);
 
     const proc = Bun.spawn(
       ["bun", "run", "scripts/image-variants.ts", `${workDir}/seed/probe.jpg`, "probe", "--widths", "640,1024", "--out", workDir],
@@ -315,18 +281,18 @@ describe.skipIf(!hasFfmpeg)("image variant generator", () => {
 
   test("refuses to overwrite an existing full-size file without --force", async () => {
     await run(`rm -rf ${workDir} && mkdir -p ${workDir}/out`);
-    await run(`cp static/images/hero.jpg ${workDir}/out/keep.jpg`);
+    await run(`cp public/static/images/hero.jpg ${workDir}/out/keep.jpg`);
 
     const before = await sha(`${workDir}/out/keep.jpg`);
     const refused = Bun.spawn(
-      ["bun", "run", "scripts/image-variants.ts", "static/images/hero.jpg", "keep", "--widths", "640", "--out", `${workDir}/out`],
+      ["bun", "run", "scripts/image-variants.ts", "public/static/images/hero.jpg", "keep", "--widths", "640", "--out", `${workDir}/out`],
       { stdout: "pipe", stderr: "pipe" },
     );
     expect(await refused.exited).not.toBe(0);
     expect(await sha(`${workDir}/out/keep.jpg`)).toBe(before);
 
     const forced = Bun.spawn(
-      ["bun", "run", "scripts/image-variants.ts", "static/images/hero.jpg", "keep", "--widths", "640", "--out", `${workDir}/out`, "--force"],
+      ["bun", "run", "scripts/image-variants.ts", "public/static/images/hero.jpg", "keep", "--widths", "640", "--out", `${workDir}/out`, "--force"],
       { stdout: "pipe", stderr: "pipe" },
     );
     expect(await forced.exited).toBe(0);
@@ -335,7 +301,7 @@ describe.skipIf(!hasFfmpeg)("image variant generator", () => {
 
   test("rejects a width larger than the source instead of upscaling", async () => {
     const proc = Bun.spawn(
-      ["bun", "run", "scripts/image-variants.ts", "static/images/hero.jpg", "big", "--widths", "9000", "--out", `${workDir}/up`],
+      ["bun", "run", "scripts/image-variants.ts", "public/static/images/hero.jpg", "big", "--widths", "9000", "--out", `${workDir}/up`],
       { stdout: "pipe", stderr: "pipe" },
     );
     const stderr = await new Response(proc.stderr).text();
@@ -352,13 +318,13 @@ describe("image variant script registration", () => {
   });
 });
 
-describe("static mirror script registration", () => {
-  test("registers the vercel:prepare script the Vercel build command runs", async () => {
-    const manifest = JSON.parse(await readProjectFile("package.json")) as { scripts: Record<string, string> };
-    const config = await readVercelConfig();
+describe("image variant destination", () => {
+  test("defaults to the committed public/static/images tree", async () => {
+    // The generated variants must land where both targets serve them from, and the printed
+    // srcset is paste-ready for that tree, so the default is part of the contract.
+    const generator = await readProjectFile("scripts/image-variants.ts");
 
-    expect(manifest.scripts["vercel:prepare"]).toBe("bun run scripts/prepare-public.ts");
-    expect(config.buildCommand).toContain(manifest.scripts["vercel:prepare"]);
+    expect(generator).toContain('let outDir = "public/static/images"');
   });
 });
 

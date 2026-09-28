@@ -81,7 +81,7 @@ const imageAssetMap = {
     srcset: prayerFellowshipSrcset,
     sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
   },
-  logo: { src: "/static/images/logo.jpg", width: 200, height: 200, alt: "Kingdom Covenant of Christ Fellowship" },
+  logo: { src: "/static/images/logo.jpg", width: 200, height: 200, alt: "KCCF Ministries" },
   about: {
     src: "/static/images/about.jpg",
     width: 4389,

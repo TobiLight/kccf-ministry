@@ -1,9 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "bunVersion": "1.3.14",
+  "bunVersion": "1.x",
   "installCommand": "bun install --frozen-lockfile",
   "regions": ["fra1"],
-  "buildCommand": "bun run css:build && bun run scripts/prepare-public.ts",
   "headers": [
     {
       "source": "/static/images/(.*)",

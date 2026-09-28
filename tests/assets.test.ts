@@ -141,12 +141,12 @@ describe("responsive image variants", () => {
 
 describe("vendored Datastar runtime", () => {
   test("ships no source map reference and no source map file", async () => {
-    const vendored = await readFile(new URL("../static/datastar.js", import.meta.url), "utf8");
+    const vendored = await readFile(new URL("../public/static/datastar.js", import.meta.url), "utf8");
 
     expect(vendored).not.toContain("sourceMappingURL");
     expect(vendored).not.toContain("datastar.js.map");
     expect(vendored.endsWith("\n")).toBe(true);
-    expect(existsSync(new URL("../static/datastar.js.map", import.meta.url))).toBe(false);
+    expect(existsSync(new URL("../public/static/datastar.js.map", import.meta.url))).toBe(false);
   });
 
   test("serves the runtime without a source map reference and 404s the map URL", async () => {

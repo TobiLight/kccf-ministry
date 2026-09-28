@@ -230,13 +230,13 @@ describe.skipIf(!chromePath)("real browser smoke", () => {
     `);
 
     expect(branding.favicon).toBe("/static/favicon.svg");
-    // The header brands with the circular logo alone, so the link is named by the image's
-    // alt text. The footer uses the same logo with the church's full name as its alt.
+    // The header and footer brand with the circular logo alone, so each brand link is named
+    // by the image's alt text, which the content map owns for both.
     expect(branding.brandName).toBe("KCCF Ministries");
     expect(branding.brandVisible).toBe(true);
     expect(branding.skipLabel).toBeNull();
     expect(branding.skipText).toBe("Skip to main content");
-    expect(branding.footerName).toBe("Kingdom Covenant of Christ Fellowship");
+    expect(branding.footerName).toBe("KCCF Ministries");
   });
 
   test("loads a YouTube player only after pressing play, and swaps it from the archive", async () => {

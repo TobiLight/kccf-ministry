@@ -11,7 +11,7 @@ FROM dependencies AS build
 
 COPY tsconfig.json ./
 COPY src ./src
-COPY static ./static
+COPY public ./public
 
 RUN bun run css:build && bun run build
 
@@ -24,7 +24,7 @@ COPY tsconfig.json ./
 COPY package.json ./
 COPY scripts ./scripts
 COPY src ./src
-COPY static ./static
+COPY public ./public
 COPY tests ./tests
 
 EXPOSE 3000
@@ -39,7 +39,7 @@ FROM base AS production
 ENV NODE_ENV=production
 ENV PORT=3000
 
-COPY --from=build /app/static ./static
+COPY --from=build /app/public ./public
 COPY --from=build /app/dist ./dist
 
 USER bun

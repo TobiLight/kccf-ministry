@@ -153,7 +153,7 @@ export function findValue(rules: CssRule[], selector: string, property: string, 
 }
 
 export async function readShippedStylesheet() {
-  return readFile(new URL("../static/style.css", import.meta.url), "utf8");
+  return readFile(new URL("../public/static/style.css", import.meta.url), "utf8");
 }
 
 export async function readSourceStylesheet() {
@@ -423,7 +423,7 @@ describe("past event treatment", () => {
     // past card.
     for (const [name, rules] of [
       ["src/input.css", parseStylesheet(await readSourceStylesheet())],
-      ["static/style.css", parseStylesheet(await readShippedStylesheet())],
+      ["public/static/style.css", parseStylesheet(await readShippedStylesheet())],
     ] as const) {
       const unlayered = (selector: string) =>
         rules.findIndex(

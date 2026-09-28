@@ -8,7 +8,7 @@ A lightweight public website for KCCF Ministry, built with Bun, Hono, TypeScript
 - **Web framework**: Hono
 - **Language**: TypeScript with JSX support
 - **Styling**: Tailwind CSS v4
-- **Frontend interaction**: Vendored Datastar v1.0.0-RC.7 in `static/datastar.js`
+- **Frontend interaction**: Vendored Datastar v1.0.0-RC.7 in `public/static/datastar.js`
 - **Persistence**: None
 
 This is a stateless public site. It does not persist user data.
@@ -27,7 +27,7 @@ The application exposes:
 - `/events` - Weekly services, the monthly Transformation Night, and featured events
 - `/leadership` - Pastoral and ministry leadership
 - `/contact` - Contact details, visit information, and frontend-only form
-- `/static/*` - Files served from the project root's `static/` directory
+- `/static/*` - Files served from the committed `public/static/` tree
 - Unknown routes - Rendered 404 page with status 404
 
 Route composition belongs in `src/routes/index.ts`, where `configureRoutes(app)` registers the Hono handlers.
@@ -71,8 +71,8 @@ The tradeoff and its boundaries:
 - `src/components/ui/` - Shared presentation components (hero, card, button, icon, section heading)
 - `src/content/` - Typed site, ministry, sermon, event, and leadership content
 - `src/input.css` - Tailwind source styles and design tokens
-- `static/` - Generated CSS, the vendored Datastar runtime, and browser assets
-- `static/images/` - Local JPEG assets plus the generated responsive variants
+- `public/static/` - Generated CSS, the vendored Datastar runtime, and browser assets
+- `public/static/images/` - Local JPEG assets plus the generated responsive variants
 - `scripts/dev.ts` - Dependency-free development supervisor that runs the Tailwind watcher and the watched server together
 - `tests/` - Bun application, asset, stylesheet, component, interaction, route, accessibility, tooling, and real-browser tests
 
@@ -105,7 +105,7 @@ files it just wrote. The sizes it prints are already checked against the real JP
 `tests/assets.test.ts`, so a hand-written command that guesses a dimension fails the suite.
 
 ```bash
-bun run image:variants static/images/hero.jpg hero --widths 640,1024,1600 --src-width 2048 --force
+bun run image:variants public/static/images/hero.jpg hero --widths 640,1024,1600 --src-width 2048 --force
 ```
 
 Do not hand-roll an `ffmpeg` invocation: the committed variants are written at `-q:v 4` and
@@ -118,7 +118,7 @@ The mobile navigation uses Datastar signals for its menu, valid reactive ARIA st
 
 Contact form state is scoped to a `$contact` signal object so it can never collide with the header's `$menuOpen` and `$marqueePaused` signals. The submit handler clears the fields with a native `el.reset()` in the same tick that flips to the success state, so the "your message was cleared" copy stays true.
 
-Page heroes and thumbnails emit intrinsic dimensions from the image metadata map; card thumbnails use empty alt text when their adjacent title carries the meaning. The header and footer both brand with the circular logo alone, so each brand link is named by its image's `alt` text — "KCCF Ministries" in the header and the church's full name in the footer — with no visually hidden text span alongside it, which would name the link twice. The skip link names itself once through its own text. Section headings and heroes use the `animate-fade-up`, `animate-fade-in`, and `animate-soft-bounce` theme utilities, which use `backwards` fill so a disabled or reduced-motion animation can never leave content at `opacity: 0`. The custom keyframe is named `soft-bounce` so it cannot collide with Tailwind's own `animate-bounce` utility. Social routes do not emit relative Open Graph image metadata.
+Page heroes and thumbnails emit intrinsic dimensions from the image metadata map; card thumbnails use empty alt text when their adjacent title carries the meaning. The header and footer both brand with the circular logo alone, so each brand link is named by its image's `alt` text, "KCCF Ministries", which `imageAssetMap` owns for both rather than either component hardcoding its own string, and with no visually hidden text span alongside the logo, which would name the link twice. The skip link names itself once through its own text. Section headings and heroes use the `animate-fade-up`, `animate-fade-in`, and `animate-soft-bounce` theme utilities, which use `backwards` fill so a disabled or reduced-motion animation can never leave content at `opacity: 0`. The custom keyframe is named `soft-bounce` so it cannot collide with Tailwind's own `animate-bounce` utility. Social routes do not emit relative Open Graph image metadata.
 
 ## Development
 
@@ -134,7 +134,7 @@ Start the development stack:
 bun run dev
 ```
 
-`dev` runs `scripts/dev.ts`, a dependency-free supervisor that starts the Tailwind watcher (`src/input.css` -> `static/style.css`) and the watched Bun server together, forwards `SIGINT`, `SIGTERM`, and `SIGHUP` to both, and stops the whole group as soon as either process exits. That is the same command the development container runs, so the container and the workstation always behave identically.
+`dev` runs `scripts/dev.ts`, a dependency-free supervisor that starts the Tailwind watcher (`src/input.css` -> `public/static/style.css`) and the watched Bun server together, forwards `SIGINT`, `SIGTERM`, and `SIGHUP` to both, and stops the whole group as soon as either process exits. That is the same command the development container runs, so the container and the workstation always behave identically.
 
 Both watchers must be started with `--watch=always` (and `css:watch` does the same). Plain `--watch` makes the Tailwind CLI exit as soon as stdin reaches end-of-file, which is immediate in a container or any non-interactive shell, so the watcher silently dies after one build.
 
@@ -157,7 +157,7 @@ bun run check
 
 `tests/browser.test.ts` is a real-browser smoke suite: it serves the app on an ephemeral port, launches the headless Chrome already installed on the machine with a throwaway profile, and drives the page over the DevTools protocol. It asserts that the Datastar module loads without any page or console error (no `EvalError`, no `Unexpected token`, no CSP violation), that the mobile trigger toggles `aria-expanded` and the menu, that the marquee toggle flips `aria-pressed`/`is-paused` and its visible label, that the contact form never issues a `POST` while disabling the button and then reporting success, and that the header branding, favicon, and skip link are named once. No browser framework is involved; `tests/support/browser.ts` is a small dependency-free CDP client. The browser smoke runs when a Chrome or Chromium binary is discoverable; otherwise it skips and prints a warning naming the reason (no discoverable Chrome or Chromium binary) and the `KCCF_CHROME_PATH` override that makes it run, so a skipped run is never silently green. The suite also asserts that the page never requests a `.map` file, so the vendored runtime cannot start dangling source-map fetches.
 
-`bun run check` runs the type check, **CSS build**, tests, and application build in that order. Building CSS before the tests means the stylesheet assertions always run against freshly generated CSS and can never ratify a stale `static/style.css`.
+`bun run check` runs the type check, **CSS build**, tests, and application build in that order. Building CSS before the tests means the stylesheet assertions always run against freshly generated CSS and can never ratify a stale `public/static/style.css`.
 
 Build and run the production output locally:
 
@@ -171,13 +171,13 @@ bun run start
 The Dockerfile is pinned to `oven/bun:1.3.14-alpine` and has four stages:
 
 - `dependencies` - installs from `bun.lock` with `--frozen-lockfile`
-- `build` - adds `tsconfig.json`, `src/`, and `static/`, then compiles CSS and bundles the app
+- `build` - adds `tsconfig.json`, `src/`, and `public/`, then compiles CSS and bundles the app
 - `development` - source, scripts, full dependencies, and static assets, running the `bun run dev` supervisor (Tailwind watcher plus watched server) on port 3000
-- `production` - only `static/` and the self-contained `dist/index.js`, running as the non-root `bun` user
+- `production` - only `public/` and the self-contained `dist/index.js`, running as the non-root `bun` user
 
 Both runtime stages declare a `HEALTHCHECK` against `/health`.
 
-Run the development container (source, scripts, and static are bind-mounted, dependencies live in a named volume). The container supervises the Tailwind watcher and the server exactly like the local `bun run dev`, so editing `src/input.css` rebuilds `static/style.css` in place through the bind mount:
+Run the development container (source, scripts, and public are bind-mounted, dependencies live in a named volume). The container supervises the Tailwind watcher and the server exactly like the local `bun run dev`, so editing `src/input.css` rebuilds `public/static/style.css` in place through the bind mount:
 
 ```bash
 docker compose up --build
@@ -217,25 +217,35 @@ The production image needs no `node_modules`: `bun build --target bun` produces 
 
 ## Vercel
 
-Vercel is a second supported deployment target alongside Docker, not a replacement. Nothing in `src/`, `static/`, the `Dockerfile`, or either Compose file changes for it; all of the Vercel-specific configuration lives in `vercel.json` and `scripts/prepare-public.ts`.
+Vercel is a second supported deployment target alongside Docker, not a replacement. Everything Vercel-specific lives in `vercel.json`; no component, route, or test changes between the two targets.
 
 Vercel has zero-configuration support for Hono: it detects `src/index.ts` and serves the application from that file's default export. The existing `export default { port, fetch: app.fetch }` already has the `fetch` property Vercel reads, so it needed no modification. `port` is Bun's own server hint and is ignored off-platform.
 
+### There is no build step
+
+`vercel.json` deliberately sets **no `buildCommand` and no `outputDirectory`**. Vercel runs its own Hono build, and the docs are explicit that the zero-config path takes neither.
+
+Overriding `buildCommand` replaces Vercel's Hono build with an arbitrary command. Vercel then falls back to a generic static build, looks for its own default output directory, and the deployment fails with:
+
+```
+Error: No Output Directory named "dist" found after the Build completed.
+```
+
+`tests/tooling.test.ts` asserts both keys are absent, so this cannot quietly come back.
+
+That constraint is what shapes the asset layout. Because nothing runs at build time, every asset a visitor loads has to be committed.
+
 ### Static assets
 
-Vercel serves `public/**` from its CDN and **ignores Hono's `serveStatic()`**, so on Vercel the CSS, the vendored Datastar runtime, and the images are delivered by the edge rather than by the function. `static/` remains the single source of truth; the Vercel build command mirrors it:
+Vercel serves `public/**` from its CDN and **ignores Hono's `serveStatic()`**. So the assets live in `public/static/`, committed, and Hono's `serveStatic({ root: "./public" })` serves the same tree locally and in the container. One tree, one mechanism, no mirroring step and no generated directory that could drift from the source.
 
-```
-bun run css:build && bun run scripts/prepare-public.ts
-```
+The `/static/` URL prefix is identical on both targets, so no path, component, or test changes.
 
-`public/static/` is build output. It is gitignored, dockerignored, and regenerated on every build. **Edit `static/`, never `public/static/`.** The script wipes its destination before copying, so an asset deleted from `static/` cannot survive as a stale CDN file, and it exits non-zero when `static/` is missing — a silent no-op would publish a site with no stylesheet and no Datastar runtime, which still renders but loses every interaction.
-
-The `/static/` URL prefix is identical on all three targets: Hono serves it during local development and in the container, and the Vercel CDN serves it in production. No path, component, or test changes between them.
+`public/static/style.css` is compiled output and is committed so Vercel can serve it without building. Run `bun run css:build` (or `bun run check`, which does it before the tests) after editing `src/input.css`, and commit the result. This is the one file in the tree that is both build output and source of truth for the deployment.
 
 ### Caching and headers
 
-`vercel.json` sets `Cache-Control` for the mirrored assets. The stylesheet and the Datastar runtime are `must-revalidate` because `style.css` is regenerated on every deploy. The images get a one-day TTL with `stale-while-revalidate` rather than `immutable`, because the ladder filenames (`hero-640.jpg`) are not content-addressed: regenerating a ladder keeps the URL, so `immutable` would pin a replaced photo to a visitor for a year.
+`vercel.json` sets `Cache-Control` for the assets. The stylesheet and the Datastar runtime are `must-revalidate`, so a deploy that recompiles the stylesheet is picked up immediately. The images get a one-day TTL with `stale-while-revalidate` rather than `immutable`, because the ladder filenames (`hero-640.jpg`) are not content-addressed: regenerating a ladder keeps the URL, so `immutable` would pin a replaced photo to a visitor for a year.
 
 One consequence worth knowing: assets served by the Vercel CDN do not pass through `secureHeaders()`, so they carry Vercel's default response headers rather than this site's CSP. That is correct — the CSP governs documents, and a stylesheet or a module needs none — but it does mean the header assertions in `tests/routes.test.ts` describe the Hono and Docker path specifically.
 
@@ -248,7 +258,8 @@ vercel link
 vercel deploy --prod
 ```
 
-`bun.lock` makes Vercel install with Bun, and `vercel.json` pins `installCommand` to `bun install --frozen-lockfile` so the deployed dependency tree is the committed one. `bunVersion` is pinned to the same `oven/bun:1.3.14` base image the `Dockerfile` uses, and `tests/tooling.test.ts` fails if those two ever drift. `regions` is set to `fra1`, the nearest Vercel region to Lagos.
+`bun.lock` makes Vercel install with Bun, and `vercel.json` pins `installCommand` to `bun install --frozen-lockfile` so the deployed dependency tree is the committed one. `bunVersion` is set to `1.x`, which is the most Vercel accepts — it manages the minor and patch versions itself — and `tests/tooling.test.ts` asserts that major matches the `oven/bun:1.3.14` base image the `Dockerfile` uses. `regions` is set to `fra1`, the nearest Vercel region to Lagos.
 
-The `vercel dev` command runs the same routing, headers, and asset serving locally before you ship. Note that the Bun *function runtime itself* is only exercised in production, so the first deploy is where that assumption gets tested.
+`vercel dev` runs the same routing, headers, and asset serving locally before you ship. Note that the Bun *function runtime itself* is only exercised in production, so the first deploy is where that assumption gets tested.
+
 
