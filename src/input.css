@@ -1334,6 +1334,24 @@ section {
   font-weight: 700;
 }
 
+.past-event-card {
+  border-color: var(--color-warm-border);
+  box-shadow: none;
+}
+
+.past-event-card .card-content .eyebrow {
+  color: var(--color-muted-foreground);
+}
+
+.past-event-card:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.event-recap {
+  font-size: 0.95rem;
+}
+
 .empty-state-large {
   padding-block: 3rem;
 }

@@ -22,7 +22,7 @@ The application exposes:
 - `/about` - Calling, beliefs, story, and leaders
 - `/ministries` - Six ministry opportunities
 - `/sermons` - Recent messages and Facebook viewing links
-- `/events` - Weekly services, the monthly Transformation Night, and featured events
+- `/events` - Weekly services, the monthly Transformation Night, upcoming events, and past events
 - `/leadership` - Pastoral and ministry leadership
 - `/contact` - Contact details, visit information, and frontend-only form
 - `/static/*` - Files served from the project root's `static/` directory

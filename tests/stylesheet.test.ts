@@ -362,3 +362,26 @@ describe("shipped stylesheet contract", () => {
     }
   });
 });
+
+describe("past event treatment", () => {
+  test("mutes the past event card without introducing new colour tokens", async () => {
+    const shipped = parseStylesheet(await readShippedStylesheet());
+    const source = parseStylesheet(await readSourceStylesheet());
+
+    for (const rules of [source, shipped]) {
+      expect(findValue(rules, ".past-event-card", "border-color", null)).toEqual(["var(--color-warm-border)"]);
+      expect(findValue(rules, ".past-event-card", "box-shadow", null)).toEqual(["none"]);
+      expect(findValue(rules, ".past-event-card:hover", "transform", null)).toEqual(["none"]);
+      expect(findValue(rules, ".past-event-card:hover", "box-shadow", null)).toEqual(["none"]);
+    }
+  });
+
+  test("styles the recap line inside a card", async () => {
+    const shipped = parseStylesheet(await readShippedStylesheet());
+    const source = parseStylesheet(await readSourceStylesheet());
+
+    for (const rules of [source, shipped]) {
+      expect(findValue(rules, ".event-recap", "font-size", null)).toEqual(["0.95rem"]);
+    }
+  });
+});

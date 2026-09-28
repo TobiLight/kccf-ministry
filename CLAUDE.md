@@ -33,11 +33,12 @@ Bun is the only supported package manager and `bun.lock` is the only lockfile. D
 - `src/components/ui/` holds the shared presentation components: `PageHero`, `Card`, `ButtonLink`, `Icon`, and `SectionHeading`.
 - `src/input.css` contains the Tailwind source configuration, design tokens, and the `--animate-*` theme tokens. The custom bounce keyframe is `soft-bounce` (utility `animate-soft-bounce`) so it never shadows Tailwind's own `animate-bounce`.
 - `scripts/dev.ts` is the development supervisor: it spawns the Tailwind watcher and `bun run --watch src/index.ts`, forwards `SIGINT`/`SIGTERM`/`SIGHUP`, and stops both children when either exits. Keep it dependency-free.
+- `scripts/image-variants.ts` regenerates image width ladders with the system `ffmpeg` and prints a paste-ready `srcset` literal plus the real `width`/`height` read back off disk. It is the only sanctioned way to change an image ladder: `tests/assets.test.ts` compares declared dimensions against real JPEG header bytes, so a hand-written guess fails there. For each asset the bare `<name>.jpg` is the largest local file and leads the ladder, so request only widths narrower than `--src-width`; an existing bare file at a different width is a hard error unless you pass `--force`. It refuses to upscale.
 - Both the supervisor and `css:watch` pass `--watch=always`. The Tailwind CLI exits when stdin closes unless `always` is set, so plain `--watch` dies after a single build in containers and non-interactive shells.
 - `tests/support/browser.ts` is a minimal Chrome DevTools Protocol client used by the real-browser smoke suite; `tests/browser.test.ts` runs when a Chrome or Chromium binary is discoverable; otherwise `describe.skipIf` skips the suite and a single `console.warn` names the reason and the `KCCF_CHROME_PATH` override, so a missing Chrome is visible instead of falsely green.
 - `static/` contains generated CSS, the vendored Datastar runtime, and site assets.
-- `static/images/` contains the local JPEG assets plus generated width-descriptor variants: `about-640/1024/1600/2400.jpg`, `hero-640/1024/1600.jpg`, `worship-moment-640/1024/1600.jpg`, and `prayer-fellowship-640/1024/1600.jpg`. Declared dimensions in `imageAssetMap` must match the real JPEG headers; `tests/assets.test.ts` enforces that.
-- `src/content/site.ts` owns image metadata. Add `srcset`/`sizes` to the asset and resolve them with `getImageSource(src, sizes?)` rather than hardcoding paths in a component.
+- `static/images/` contains the local JPEG assets plus generated width-descriptor variants: `about-640/1024/1600/2400.jpg` and `hero-640/1024/1600.jpg`, each asset's bare `<name>.jpg` serving as the top rung of its own ladder. `worship-moment` and `prayer-fellowship` therefore have only `worship-moment-640/1024.jpg` and `prayer-fellowship-640/1024.jpg` — their bare files *are* the 1600 rung, so no `-1600.jpg` file exists for them. Declared dimensions in `imageAssetMap` must match the real JPEG headers; `tests/assets.test.ts` enforces that.
+- `src/content/site.ts` owns image metadata. Add `srcset`/`sizes` to the asset and resolve them with `getImageSource(src, sizes?)` rather than hardcoding paths in a component. For each asset, `src` is the **largest local file for that asset** and is itself the top `srcset` entry; `tests/assets.test.ts` pins this for `hero` and `about`. Never ship a full-resolution original as a `src` when a 1600w derivative is available — a 6000×4000 original is over 10 MB. Generate ladders with `bun run scripts/image-variants.ts <source> <base-name>`, which prints the paste-ready `srcset` literal and the real `width`/`height` read back from the generated files.
 - `tests/stylesheet.test.ts` parses both `src/input.css` and the shipped `static/style.css` and asserts the responsive grid, marquee, motion, and contact-strip contracts.
 - `tests/interactions.test.ts` covers rendered Datastar contracts, the motion utilities, and the accessibility audit.
 - `tests/assets.test.ts` verifies local image routes and the responsive variants are valid JPEGs.
@@ -61,6 +62,28 @@ The canonical address lives in `src/content/site.ts` and is reused by the header
 ```
 13-17 Taiwo Akinsulire Street, Off Taiwo Ajakaiye Street, Foursquare bus stop, Ikotun-Ikosi Road, Ikotun, Lagos, Nigeria
 ```
+
+### Events
+
+`src/content/events.ts` owns a single `events: ChurchEvent[]` array plus two derived
+selectors, `upcomingEvents` and `pastEvents`. The `/events` page and the home teaser must
+read those selectors and never filter `events` themselves.
+
+`ChurchEvent.status` is `"upcoming" | "past"` and is **hand-set**. It is never derived by
+comparing `date` to the clock. The codebase has no date parsing at all: `date` and `time`
+are human display strings such as `"September 20, 2026"`, written to be printed and never
+parsed, which the ECMAScript spec does not guarantee for `new Date()`. A `Date.now()`
+comparison would also reclassify events silently at an arbitrary hour, in the wrong
+timezone — Lagos is UTC+1 while the copyright year in `site-footer.tsx` uses
+`getUTCFullYear()`. Promoting an event from `upcoming` to `past` is a deliberate editorial
+edit to `events.ts`, and the shipped content is the record of that decision.
+
+Two of the four upcoming events have no announced date, so `date` and `time` are both
+optional. Always render a schedule through `formatEventSchedule()`, which returns
+`"Date to be announced"` when neither is set. Never interpolate `event.date` directly.
+
+Events carry no image, no photograph gallery, and no slug. A dedicated photo gallery page
+is deliberately deferred; do not add those fields speculatively.
 
 ## Static assets and routes
 
