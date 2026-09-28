@@ -21,7 +21,7 @@ The application exposes:
 - `/` - Home and worship invitation
 - `/about` - Calling, beliefs, story, and leaders
 - `/ministries` - Six ministry opportunities
-- `/sermons` - Recent messages and Facebook viewing links
+- `/sermons` - Featured player, curated highlights, and a year-grouped archive of recorded messages
 - `/events` - Weekly services, the monthly Transformation Night, and featured events
 - `/leadership` - Pastoral and ministry leadership
 - `/contact` - Contact details, visit information, and frontend-only form
@@ -44,7 +44,9 @@ The canonical address lives in `src/content/site.ts` and is used everywhere:
 
 ## Security headers
 
-`createApp()` installs Hono's `secureHeaders()` middleware for every response. The content security policy is same-origin only: styles load from `'self'` plus `https://fonts.googleapis.com` for the stylesheet and `https://fonts.gstatic.com` for the web fonts, images from `'self' data:`, and connections from `'self'`. `frame-ancestors 'none'` and `X-Frame-Options: DENY` block framing, and `X-Content-Type-Options: nosniff` plus `Referrer-Policy: strict-origin-when-cross-origin` are set alongside it.
+`createApp()` installs Hono's `secureHeaders()` middleware for every response. The content security policy is same-origin only with one exception: styles load from `'self'` plus `https://fonts.googleapis.com` for the stylesheet and `https://fonts.gstatic.com` for the web fonts, images from `'self' data:`, connections from `'self'`, and `frame-src 'self' https://www.youtube-nocookie.com` for the sermon player's embed. `frame-ancestors 'none'` and `X-Frame-Options: DENY` block framing, and `X-Content-Type-Options: nosniff` plus `Referrer-Policy: strict-origin-when-cross-origin` are set alongside it.
+
+That `frame-src` exception is scoped as tightly as the script relaxation below. The sermon player is a click-to-load facade, so the embed is a separate browsing context governed by YouTube's own policy and no YouTube JavaScript reaches the parent document — which is why `frame-src` was the only directive the feature needed, rather than the nonce plus `connect.facebook.net` allowance an embedded Facebook SDK would have demanded.
 
 Scripts are the one deliberate relaxation. Datastar compiles every `data-on:*`, `data-bind`, `data-show`, and `data-attr:*` expression with the `Function` constructor at runtime, which is the framework's documented requirement (see [Datastar security](https://data-star.dev/reference/security)), so the policy is:
 
