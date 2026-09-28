@@ -371,8 +371,42 @@ describe("past event treatment", () => {
     for (const rules of [source, shipped]) {
       expect(findValue(rules, ".past-event-card", "border-color", null)).toEqual(["var(--color-warm-border)"]);
       expect(findValue(rules, ".past-event-card", "box-shadow", null)).toEqual(["none"]);
+      // The schedule line is the only visual difference left on a past card, so the
+      // muted eyebrow colour needs its own contract rather than riding on the others.
+      expect(findValue(rules, ".past-event-card .card-content .eyebrow", "color", null)).toEqual([
+        "var(--color-muted-foreground)",
+      ]);
       expect(findValue(rules, ".past-event-card:hover", "transform", null)).toEqual(["none"]);
       expect(findValue(rules, ".past-event-card:hover", "box-shadow", null)).toEqual(["none"]);
+    }
+  });
+
+  test("keeps the muted hover rule after .card:hover so the muted treatment wins the cascade", async () => {
+    // .card:hover and .past-event-card:hover have identical specificity (one class plus
+    // one pseudo-class), so the only thing separating them is source order: the later
+    // rule wins. Asserting both rules exist and say what they say proves nothing about
+    // which one the browser applies, so pin the order itself. This is the property the
+    // whole past-event treatment rests on — moving .past-event-card:hover above
+    // .card:hover silently restores the lift and the elevated box-shadow on every
+    // past card.
+    for (const [name, rules] of [
+      ["src/input.css", parseStylesheet(await readSourceStylesheet())],
+      ["static/style.css", parseStylesheet(await readShippedStylesheet())],
+    ] as const) {
+      const unlayered = (selector: string) =>
+        rules.findIndex(
+          (rule) => rule.selector === selector && rule.conditions.every((entry) => !entry.startsWith("@")),
+        );
+
+      const card = unlayered(".card:hover");
+      const past = unlayered(".past-event-card:hover");
+
+      expect({ name, card, past, ordered: card !== -1 && past !== -1 && card < past }).toEqual({
+        name,
+        card,
+        past,
+        ordered: true,
+      });
     }
   });
 
