@@ -24,6 +24,8 @@ services:
       - ./Dockerfile:/app/Dockerfile:ro
       - ./docker-compose.yml:/app/docker-compose.yml:ro
       - ./docker-compose.prod.yml:/app/docker-compose.prod.yml:ro
+      - ./.gitignore:/app/.gitignore:ro
+      - ./.dockerignore:/app/.dockerignore:ro
       - node_modules:/app/node_modules
     healthcheck:
       test: ["CMD", "bun", "-e", "const response = await fetch('http://127.0.0.1:3000/health'); process.exit(response.ok ? 0 : 1)"]

@@ -207,10 +207,48 @@ docker compose down -v && docker compose -f docker-compose.prod.yml down -v
 
 `docker-compose.prod.yml` declares no volumes at all, so nothing from the development bind mounts can leak into the production runtime, and it needs no `!reset`, so it works on any Compose version that supports the long-merge syntax. Do not merge it with `docker-compose.yml`.
 
-The development stack also read-only bind-mounts the repository-root files that `tests/tooling.test.ts` asserts against (`package.json`, `tsconfig.json`, `bun.lock`, `Dockerfile`, `docker-compose.yml`, and `docker-compose.prod.yml`), so `bun test` inside the container checks the same files the host does:
+The development stack also read-only bind-mounts the repository-root files that `tests/tooling.test.ts` asserts against (`package.json`, `tsconfig.json`, `bun.lock`, `Dockerfile`, `docker-compose.yml`, `docker-compose.prod.yml`, `.gitignore`, and `.dockerignore`), so `bun test` inside the container checks the same files the host does:
 
 ```bash
 docker compose exec app bun test
 ```
 
 The production image needs no `node_modules`: `bun build --target bun` produces a self-contained bundle, so the runtime stage starts `bun dist/index.js` directly. `bun run start` remains available for running the same bundle locally.
+
+## Vercel
+
+Vercel is a second supported deployment target alongside Docker, not a replacement. Nothing in `src/`, `static/`, the `Dockerfile`, or either Compose file changes for it; all of the Vercel-specific configuration lives in `vercel.json` and `scripts/prepare-public.ts`.
+
+Vercel has zero-configuration support for Hono: it detects `src/index.ts` and serves the application from that file's default export. The existing `export default { port, fetch: app.fetch }` already has the `fetch` property Vercel reads, so it needed no modification. `port` is Bun's own server hint and is ignored off-platform.
+
+### Static assets
+
+Vercel serves `public/**` from its CDN and **ignores Hono's `serveStatic()`**, so on Vercel the CSS, the vendored Datastar runtime, and the images are delivered by the edge rather than by the function. `static/` remains the single source of truth; the Vercel build command mirrors it:
+
+```
+bun run css:build && bun run scripts/prepare-public.ts
+```
+
+`public/static/` is build output. It is gitignored, dockerignored, and regenerated on every build. **Edit `static/`, never `public/static/`.** The script wipes its destination before copying, so an asset deleted from `static/` cannot survive as a stale CDN file, and it exits non-zero when `static/` is missing — a silent no-op would publish a site with no stylesheet and no Datastar runtime, which still renders but loses every interaction.
+
+The `/static/` URL prefix is identical on all three targets: Hono serves it during local development and in the container, and the Vercel CDN serves it in production. No path, component, or test changes between them.
+
+### Caching and headers
+
+`vercel.json` sets `Cache-Control` for the mirrored assets. The stylesheet and the Datastar runtime are `must-revalidate` because `style.css` is regenerated on every deploy. The images get a one-day TTL with `stale-while-revalidate` rather than `immutable`, because the ladder filenames (`hero-640.jpg`) are not content-addressed: regenerating a ladder keeps the URL, so `immutable` would pin a replaced photo to a visitor for a year.
+
+One consequence worth knowing: assets served by the Vercel CDN do not pass through `secureHeaders()`, so they carry Vercel's default response headers rather than this site's CSP. That is correct — the CSP governs documents, and a stylesheet or a module needs none — but it does mean the header assertions in `tests/routes.test.ts` describe the Hono and Docker path specifically.
+
+### One-time setup
+
+Import the repository on Vercel and connect it to Git for preview deployments on pull requests, or link it from the command line:
+
+```bash
+vercel link
+vercel deploy --prod
+```
+
+`bun.lock` makes Vercel install with Bun, and `vercel.json` pins `installCommand` to `bun install --frozen-lockfile` so the deployed dependency tree is the committed one. `bunVersion` is pinned to the same `oven/bun:1.3.14` base image the `Dockerfile` uses, and `tests/tooling.test.ts` fails if those two ever drift. `regions` is set to `fra1`, the nearest Vercel region to Lagos.
+
+The `vercel dev` command runs the same routing, headers, and asset serving locally before you ship. Note that the Bun *function runtime itself* is only exercised in production, so the first deploy is where that assumption gets tested.
+

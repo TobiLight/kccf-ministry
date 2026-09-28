@@ -76,6 +76,8 @@ describe("development supervision", () => {
       "./Dockerfile",
       "./docker-compose.yml",
       "./docker-compose.prod.yml",
+      "./.gitignore",
+      "./.dockerignore",
     ]) {
       expect(readOnlyMounts, `${hostPath} must be a read-only bind mount so the tooling suite reads the live file`).toContain(
         hostPath,
@@ -118,6 +120,148 @@ describe("production compose", () => {
 
     expect(compose).toContain("/health");
     expect(compose).not.toContain(":/app/");
+  });
+});
+
+type VercelConfig = {
+  bunVersion?: string;
+  installCommand?: string;
+  regions?: string[];
+  buildCommand?: string;
+  headers?: { source: string; headers: { key: string; value: string }[] }[];
+};
+
+async function readVercelConfig() {
+  return JSON.parse(await readProjectFile("vercel.json")) as VercelConfig;
+}
+
+function cacheControl(config: VercelConfig, source: string) {
+  const rule = config.headers?.find((entry) => entry.source === source);
+  return rule?.headers.find((header) => header.key === "Cache-Control")?.value;
+}
+
+describe("vercel deployment", () => {
+  test("pins the function runtime to the same Bun version the container image uses", async () => {
+    const config = await readVercelConfig();
+    const dockerfile = await readProjectFile("Dockerfile");
+    const imageVersion = dockerfile.match(/^FROM oven\/bun:([\d.]+)-alpine AS base$/m)?.[1];
+
+    expect(imageVersion, "the Dockerfile must pin an oven/bun base image this test can read").toBeTruthy();
+    expect(config.bunVersion).toBe(imageVersion);
+    // The container and the function are separate deployments; a silent version skew is the
+    // failure mode here, and nothing else in the build would catch it.
+  });
+
+  test("installs from the lockfile rather than letting the platform resolve versions", async () => {
+    const config = await readVercelConfig();
+
+    expect(config.installCommand).toBe("bun install --frozen-lockfile");
+  });
+
+  test("builds CSS and mirrors the static tree instead of bundling for the server", async () => {
+    const config = await readVercelConfig();
+
+    // Vercel bundles the function from src/index.ts itself, so the package.json build script
+    // produces a dist/ that nothing on Vercel runs. The real build work is the stylesheet and
+    // the public/ mirror, and dropping either one deploys a site with no CSS or no JavaScript.
+    expect(config.buildCommand).toContain("css:build");
+    expect(config.buildCommand).toContain("scripts/prepare-public.ts");
+    expect(config.buildCommand).not.toContain("bun build");
+  });
+
+  test("caches the images at the edge but always revalidates the stylesheet and the runtime", async () => {
+    const config = await readVercelConfig();
+    const images = cacheControl(config, "/static/images/(.*)");
+    const stylesheet = cacheControl(config, "/static/style.css");
+    const runtime = cacheControl(config, "/static/datastar.js");
+
+    expect(images).toBeTruthy();
+    expect(stylesheet).toBe("public, max-age=0, must-revalidate");
+    expect(runtime).toBe("public, max-age=0, must-revalidate");
+
+    // style.css is regenerated on every deploy, and the image filenames are not
+    // content-addressed, so neither may be pinned immutable.
+    expect(stylesheet).not.toContain("immutable");
+    expect(images).not.toContain("immutable");
+  });
+
+  test("keeps the generated mirror and the local Vercel state out of git and the build context", async () => {
+    const gitignore = await readProjectFile(".gitignore");
+    const dockerignore = await readProjectFile(".dockerignore");
+
+    expect(gitignore).toMatch(/^public\/$/m);
+    expect(gitignore).toMatch(/^\.vercel\/$/m);
+    expect(dockerignore).toMatch(/^public$/m);
+    expect(dockerignore).toMatch(/^\.vercel$/m);
+  });
+
+  test("keeps static/ the single source of truth for the /static/ URL prefix", async () => {
+    const dockerfile = await readProjectFile("Dockerfile");
+
+    // Vercel serves the mirror from public/ while Hono serves static/ everywhere else, so the
+    // two must keep the same prefix. The mirror is what stops that from silently diverging.
+    expect(dockerfile).toContain("COPY static ./static");
+    expect(await readProjectFile(".gitignore")).not.toMatch(/^static\/$/m);
+  });
+
+  test("exposes the default export Vercel runs, with the fetch handler it reads", async () => {
+    const entry = await import("../src/index");
+
+    // Vercel detects Hono from src/index.ts and serves through this default export's fetch.
+    // port is Bun's own server hint and is ignored off-platform.
+    expect(typeof entry.default.fetch).toBe("function");
+    expect(await entry.default.fetch(new Request("https://example.test/health"))).toBeInstanceOf(Response);
+  });
+});
+
+describe("vercel static mirror", () => {
+  const workDir = "/tmp/opencode/prepare-public-test";
+
+  test("mirrors the source tree exactly, including nested directories", async () => {
+    await run(`rm -rf ${workDir} && mkdir -p ${workDir}/src/images`);
+    await run(`printf 'body{}' > ${workDir}/src/style.css && printf 'export default {};' > ${workDir}/src/datastar.js`);
+    await run(`printf 'jpegbytes' > ${workDir}/src/images/hero-640.jpg`);
+
+    const proc = Bun.spawn(["bun", "run", "scripts/prepare-public.ts", "--src", `${workDir}/src`, "--out", `${workDir}/out`], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const stdout = await new Response(proc.stdout).text();
+    expect(await proc.exited, await new Response(proc.stderr).text()).toBe(0);
+
+    expect(await Bun.file(`${workDir}/out/static/style.css`).text()).toBe("body{}");
+    expect(await Bun.file(`${workDir}/out/static/datastar.js`).text()).toBe("export default {};");
+    expect(await Bun.file(`${workDir}/out/static/images/hero-640.jpg`).text()).toBe("jpegbytes");
+    expect(stdout).toContain("3 files");
+  });
+
+  test("wipes the destination first so a deleted asset cannot survive as a stale CDN file", async () => {
+    await run(`rm -rf ${workDir} && mkdir -p ${workDir}/out/static/images`);
+    await run(`printf 'stale' > ${workDir}/out/static/images/removed.jpg`);
+
+    const proc = Bun.spawn(["bun", "run", "scripts/prepare-public.ts", "--src", "static", "--out", `${workDir}/out`], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    await new Response(proc.stdout).text();
+    expect(await proc.exited, await new Response(proc.stderr).text()).toBe(0);
+
+    expect(await Bun.file(`${workDir}/out/static/images/removed.jpg`).exists()).toBe(false);
+    expect(await Bun.file(`${workDir}/out/static/style.css`).exists()).toBe(true);
+  });
+
+  test("aborts rather than deploying a mirror of nothing", async () => {
+    const proc = Bun.spawn(["bun", "run", "scripts/prepare-public.ts", "--src", "static/absent", "--out", `${workDir}/out`], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const stderr = await new Response(proc.stderr).text();
+
+    expect(await proc.exited).not.toBe(0);
+    expect(stderr).toContain("not found");
+    // A silent no-op would publish a site with no stylesheet and no Datastar runtime, which
+    // still renders but loses every interaction - the failure mode nothing else would catch.
+    expect(await Bun.file(`${workDir}/out/static`).exists()).toBe(false);
   });
 });
 
@@ -205,6 +349,16 @@ describe("image variant script registration", () => {
   test("registers the image:variants script", async () => {
     const manifest = JSON.parse(await readProjectFile("package.json")) as { scripts: Record<string, string> };
     expect(manifest.scripts["image:variants"]).toBe("bun run scripts/image-variants.ts");
+  });
+});
+
+describe("static mirror script registration", () => {
+  test("registers the vercel:prepare script the Vercel build command runs", async () => {
+    const manifest = JSON.parse(await readProjectFile("package.json")) as { scripts: Record<string, string> };
+    const config = await readVercelConfig();
+
+    expect(manifest.scripts["vercel:prepare"]).toBe("bun run scripts/prepare-public.ts");
+    expect(config.buildCommand).toContain(manifest.scripts["vercel:prepare"]);
   });
 });
 
