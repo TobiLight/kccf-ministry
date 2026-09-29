@@ -223,7 +223,7 @@ Vercel has zero-configuration support for Hono: it detects `src/index.ts` and se
 
 ### There is no build step
 
-`vercel.json` deliberately sets **no `buildCommand` and no `outputDirectory`**. Vercel runs its own Hono build, and the docs are explicit that the zero-config path takes neither.
+`vercel.json` deliberately sets **no `buildCommand`**, and sets **`outputDirectory` to `null`**. Vercel runs its own Hono build, and the docs are explicit that the zero-config path takes no build command.
 
 Overriding `buildCommand` replaces Vercel's Hono build with an arbitrary command. Vercel then falls back to a generic static build, looks for its own default output directory, and the deployment fails with:
 
@@ -231,7 +231,11 @@ Overriding `buildCommand` replaces Vercel's Hono build with an arbitrary command
 Error: No Output Directory named "dist" found after the Build completed.
 ```
 
-`tests/tooling.test.ts` asserts both keys are absent, so this cannot quietly come back.
+`outputDirectory` needs to be an explicit `null` rather than merely absent, and this is the subtler half of the same failure. Vercel's Project Settings persists an **Output Directory** per project, and a stale `dist` left there outlives any `vercel.json` that is silent about it. `@vercel/hono` globs for the Hono entrypoint *inside* that directory rather than the project root, so it finds nothing and the build dies with the error above — even with no `buildCommand` anywhere. Setting `null` overrides the dashboard with "no output directory" and lives in the repository, so the fix survives anyone deploying without dashboard access.
+
+If you ever see this error on a fresh deploy, check Settings → Build & Development Settings and clear the Output Directory field; `vercel.json` already overrides it, so this is only a fallback for a project whose settings are read some other way.
+
+`tests/tooling.test.ts` asserts `buildCommand` is absent and `outputDirectory` is `null`, so neither can quietly come back.
 
 That constraint is what shapes the asset layout. Because nothing runs at build time, every asset a visitor loads has to be committed.
 

@@ -128,7 +128,7 @@ type VercelConfig = {
   installCommand?: string;
   regions?: string[];
   buildCommand?: string;
-  outputDirectory?: string;
+  outputDirectory?: string | null;
   headers?: { source: string; headers: { key: string; value: string }[] }[];
 };
 
@@ -142,16 +142,23 @@ function cacheControl(config: VercelConfig, source: string) {
 }
 
 describe("vercel deployment", () => {
-  test("overrides no build command or output directory, because Vercel builds Hono itself", async () => {
+  test("overrides no build command and explicitly clears the output directory", async () => {
     const config = await readVercelConfig();
 
     // Vercel detects Hono from src/index.ts and runs its own build. Overriding buildCommand
     // replaces that build with an arbitrary command, after which Vercel falls back to a
     // generic static build that looks for its default output directory - and the deployment
     // fails with 'No Output Directory named "dist" found after the Build completed'. The
-    // zero-config path takes no build command and no output directory at all.
+    // zero-config path therefore takes no build command at all.
     expect(config.buildCommand).toBeUndefined();
-    expect(config.outputDirectory).toBeUndefined();
+
+    // The output directory must be explicitly null, not merely absent. Project Settings
+    // persists an Output Directory per project, and a stale "dist" left there outlives any
+    // vercel.json that is silent about it: @vercel/hono then globs for the Hono entrypoint
+    // inside dist/ instead of the project root, finds none, and the build fails. Setting null
+    // overrides the dashboard with "no output directory" and is checked into the repository,
+    // so the fix survives anyone deploying without dashboard access.
+    expect(config.outputDirectory).toBeNull();
   });
 
   test("serves the assets from a committed public/ tree, so no build step is needed", async () => {
