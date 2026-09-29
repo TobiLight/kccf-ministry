@@ -142,23 +142,21 @@ function cacheControl(config: VercelConfig, source: string) {
 }
 
 describe("vercel deployment", () => {
-  test("overrides no build command and explicitly clears the output directory", async () => {
+  test("overrides no build command and leaves the output directory to the framework", async () => {
     const config = await readVercelConfig();
 
     // Vercel detects Hono from src/index.ts and runs its own build. Overriding buildCommand
     // replaces that build with an arbitrary command, after which Vercel falls back to a
-    // generic static build that looks for its default output directory - and the deployment
-    // fails with 'No Output Directory named "dist" found after the Build completed'. The
-    // zero-config path therefore takes no build command at all.
+    // generic static build that looks for its own default output directory - and the deployment
+    // fails with 'No Output Directory named "dist" found after the Build completed'.
     expect(config.buildCommand).toBeUndefined();
 
-    // The output directory must be explicitly null, not merely absent. Project Settings
-    // persists an Output Directory per project, and a stale "dist" left there outlives any
-    // vercel.json that is silent about it: @vercel/hono then globs for the Hono entrypoint
-    // inside dist/ instead of the project root, finds none, and the build fails. Setting null
-    // overrides the dashboard with "no output directory" and is checked into the repository,
-    // so the fix survives anyone deploying without dashboard access.
-    expect(config.outputDirectory).toBeNull();
+    // outputDirectory must be absent, and this is not negotiable. The Hono framework preset
+    // declares no output directory of its own, so an absent key lets the preset govern.
+    // Setting it to null silences the "dist" error but tells Vercel to skip the framework
+    // build and serve the project as static files, so nothing invokes the fetch handler and
+    // the visitor is shown the raw bundle. Do not add this key to silence that error.
+    expect(config.outputDirectory).toBeUndefined();
   });
 
   test("serves the assets from a committed public/ tree, so no build step is needed", async () => {

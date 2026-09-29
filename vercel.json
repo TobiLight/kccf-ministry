@@ -3,7 +3,6 @@
   "bunVersion": "1.x",
   "installCommand": "bun install --frozen-lockfile",
   "regions": ["fra1"],
-  "outputDirectory": null,
   "headers": [
     {
       "source": "/static/images/(.*)",

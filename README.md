@@ -223,21 +223,25 @@ Vercel has zero-configuration support for Hono: it detects `src/index.ts` and se
 
 ### There is no build step
 
-`vercel.json` deliberately sets **no `buildCommand`**, and sets **`outputDirectory` to `null`**. Vercel runs its own Hono build, and the docs are explicit that the zero-config path takes no build command.
+`vercel.json` deliberately sets **no `buildCommand` and no `outputDirectory`**. Vercel detects Hono from `src/index.ts` and runs its own build; the Hono framework preset declares no output directory of its own, so an absent key lets the preset govern.
 
-Overriding `buildCommand` replaces Vercel's Hono build with an arbitrary command. Vercel then falls back to a generic static build, looks for its own default output directory, and the deployment fails with:
+Two things can break this, and both are worth knowing about because neither fails the way you would expect.
+
+**A stale Output Directory in Project Settings.** Vercel persists an Output Directory per project, and it is not part of the repository. If it is set to `dist`, the build fails:
 
 ```
 Error: No Output Directory named "dist" found after the Build completed.
 ```
 
-`outputDirectory` needs to be an explicit `null` rather than merely absent, and this is the subtler half of the same failure. Vercel's Project Settings persists an **Output Directory** per project, and a stale `dist` left there outlives any `vercel.json` that is silent about it. `@vercel/hono` globs for the Hono entrypoint *inside* that directory rather than the project root, so it finds nothing and the build dies with the error above — even with no `buildCommand` anywhere. Setting `null` overrides the dashboard with "no output directory" and lives in the repository, so the fix survives anyone deploying without dashboard access.
+This is fixed in **Settings → Build & Development Settings**, by clearing the Output Directory field. It cannot be fixed from the repository: the only repo-level override, `"outputDirectory": null`, makes the failure *worse*, not better. An empty Output Directory tells Vercel to skip the build and serve the project as static files. Because the Hono build runs the `package.json` `build` script (`considerBuildCommand: true` in `@vercel/hono`), `dist/index.js` exists by then, so Vercel serves **that file** as the home page: a 200 response with `Content-Type: application/javascript`, while `/static/style.css` and `/health` both 404 because no function is ever invoked. The build looks successful and the site is silently dead.
 
-If you ever see this error on a fresh deploy, check Settings → Build & Development Settings and clear the Output Directory field; `vercel.json` already overrides it, so this is only a fallback for a project whose settings are read some other way.
+**Overriding `buildCommand`.** Setting one replaces Vercel's Hono build with an arbitrary command, after which Vercel falls back to a generic static build and looks for its own default output directory.
 
-`tests/tooling.test.ts` asserts `buildCommand` is absent and `outputDirectory` is `null`, so neither can quietly come back.
+`tests/tooling.test.ts` asserts both keys are absent, so neither can quietly come back.
 
-That constraint is what shapes the asset layout. Because nothing runs at build time, every asset a visitor loads has to be committed.
+Note that the `build` script *does* still run on Vercel, as part of the Hono build. It is harmless once the Output Directory is cleared, but it is the reason a stray `dist/index.js` exists in the build workspace.
+
+That constraint is what shapes the asset layout. Because no Vercel build produces the assets, every one a visitor loads has to be committed under `public/`.
 
 ### Static assets
 
