@@ -109,7 +109,7 @@ export function SermonsPage() {
             <div class="card-grid card-grid-three">
               {highlights.map((sermon) => (
                 <Card
-                  className="sermon-card"
+                  className="sermon-card h-fit! min-h-auto!"
                   image={sermon.youtubeId ? thumbnailUrlFor(sermon.youtubeId) : undefined}
                   imageWidth={thumbnailWidth}
                   imageHeight={thumbnailHeight}
