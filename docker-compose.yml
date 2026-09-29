@@ -20,6 +20,7 @@ services:
       - ./tests:/app/tests
       - ./package.json:/app/package.json:ro
       - ./tsconfig.json:/app/tsconfig.json:ro
+      - ./tsconfig.typecheck.json:/app/tsconfig.typecheck.json:ro
       - ./bun.lock:/app/bun.lock:ro
       - ./Dockerfile:/app/Dockerfile:ro
       - ./docker-compose.yml:/app/docker-compose.yml:ro

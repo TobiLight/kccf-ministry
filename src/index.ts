@@ -39,7 +39,13 @@ export function createApp(): Hono {
 
 export const app = createApp();
 
-const port = Number(process.env.PORT ?? 3000);
+// PORT is read through a cast instead of the bare `process` global on purpose.
+// @vercel/hono transpiles this file with a tsconfig it writes to a temp directory, where
+// no ambient type library can be resolved, so `src/` must type-check against `types: []`.
+// `types: ["bun-types"]` lives in tsconfig.typecheck.json, which only `bun run type-check`
+// uses. Referencing `process` directly here fails the Vercel build with TS2591.
+const env = (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+const port = Number(env?.PORT ?? 3000);
 
 export default {
   port,

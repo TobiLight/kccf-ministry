@@ -207,7 +207,7 @@ docker compose down -v && docker compose -f docker-compose.prod.yml down -v
 
 `docker-compose.prod.yml` declares no volumes at all, so nothing from the development bind mounts can leak into the production runtime, and it needs no `!reset`, so it works on any Compose version that supports the long-merge syntax. Do not merge it with `docker-compose.yml`.
 
-The development stack also read-only bind-mounts the repository-root files that `tests/tooling.test.ts` asserts against (`package.json`, `tsconfig.json`, `bun.lock`, `Dockerfile`, `docker-compose.yml`, `docker-compose.prod.yml`, `.gitignore`, and `.dockerignore`), so `bun test` inside the container checks the same files the host does:
+The development stack also read-only bind-mounts the repository-root files that `tests/tooling.test.ts` asserts against (`package.json`, `tsconfig.json`, `bun.lock`, `tsconfig.typecheck.json`, `Dockerfile`, `docker-compose.yml`, `docker-compose.prod.yml`, `.gitignore`, and `.dockerignore`), so `bun test` inside the container checks the same files the host does:
 
 ```bash
 docker compose exec app bun test
@@ -219,29 +219,44 @@ The production image needs no `node_modules`: `bun build --target bun` produces 
 
 Vercel is a second supported deployment target alongside Docker, not a replacement. Everything Vercel-specific lives in `vercel.json`; no component, route, or test changes between the two targets.
 
-Vercel has zero-configuration support for Hono: it detects `src/index.ts` and serves the application from that file's default export. The existing `export default { port, fetch: app.fetch }` already has the `fetch` property Vercel reads, so it needed no modification. `port` is Bun's own server hint and is ignored off-platform.
+Vercel has zero-configuration support for Hono: it detects `src/index.ts` and serves the application from that file's default export. The existing `export default { port, fetch: app.fetch }` already has the `fetch` property Vercel reads. `port` is Bun's own server hint and is ignored off-platform; it is read through a cast rather than the bare `process` global for the reason given under Type checking below.
 
-### There is no build step
+### The Framework Preset must be Hono
 
-`vercel.json` deliberately sets **no `buildCommand` and no `outputDirectory`**. Vercel detects Hono from `src/index.ts` and runs its own build; the Hono framework preset declares no output directory of its own, so an absent key lets the preset govern.
+This is the setting that matters, and it lives in **Project Settings**, not in `vercel.json`. Under **Settings → Build & Development Settings → Framework Preset**, it must read **Hono**. Leave the Output Directory and Build Command fields empty.
 
-Two things can break this, and both are worth knowing about because neither fails the way you would expect.
-
-**A stale Output Directory in Project Settings.** Vercel persists an Output Directory per project, and it is not part of the repository. If it is set to `dist`, the build fails:
+Vercel would detect Hono on its own — `hono` is a dependency and `src/index.ts` imports it — but a preset chosen when the project was created wins over detection. This project was originally created as a **Vite** app, and a stale Vite preset produces two failures that look nothing like a framework problem:
 
 ```
 Error: No Output Directory named "dist" found after the Build completed.
 ```
 
-This is fixed in **Settings → Build & Development Settings**, by clearing the Output Directory field. It cannot be fixed from the repository: the only repo-level override, `"outputDirectory": null`, makes the failure *worse*, not better. An empty Output Directory tells Vercel to skip the build and serve the project as static files. Because the Hono build runs the `package.json` `build` script (`considerBuildCommand: true` in `@vercel/hono`), `dist/index.js` exists by then, so Vercel serves **that file** as the home page: a 200 response with `Content-Type: application/javascript`, while `/static/style.css` and `/health` both 404 because no function is ever invoked. The build looks successful and the site is silently dead.
+Vite's build output directory is `dist`, so that is the directory Vercel goes looking for. And if the build does complete, Vercel serves the `dist/index.js` that the `build` script produces as the **home page** — a `200` with `Content-Type: application/javascript`, showing the visitor the raw bundle. Meanwhile `/static/style.css` and `/health` return `404`, because a Vite build produces no Hono function for them to reach. The build reports success the whole time.
 
-**Overriding `buildCommand`.** Setting one replaces Vercel's Hono build with an arbitrary command, after which Vercel falls back to a generic static build and looks for its own default output directory.
+`vercel.json` therefore sets **no `buildCommand`, no `outputDirectory`, and no `framework`**. The Hono preset declares no output directory of its own, so absent keys let the preset govern. Two tempting "fixes" are worse than the disease:
 
-`tests/tooling.test.ts` asserts both keys are absent, so neither can quietly come back.
+- `"outputDirectory": null` silences the error without moving the static output. An empty Output Directory tells Vercel to skip the build and serve the project as static files, which is exactly the state where the home page is a `.js` file.
+- `"framework": "hono"` in `vercel.json` papers over the dashboard setting, so the wrong preset can persist unnoticed and reappear the moment the key is removed.
 
-Note that the `build` script *does* still run on Vercel, as part of the Hono build. It is harmless once the Output Directory is cleared, but it is the reason a stray `dist/index.js` exists in the build workspace.
+`tests/tooling.test.ts` asserts all three keys are absent, so none of them can quietly come back.
 
-That constraint is what shapes the asset layout. Because no Vercel build produces the assets, every one a visitor loads has to be committed under `public/`.
+Note that the `build` script *does* still run on Vercel, as part of the Hono build (`considerBuildCommand: true` in `@vercel/hono`). That is expected and harmless while the preset is right — it is simply the reason a `dist/index.js` exists in the build workspace to be served by mistake when the preset is wrong.
+
+### Type checking
+
+`tsconfig.json` must not name any ambient type library. It sets `"types": []`, and `src/` is written so it compiles with no type declarations at all: `URL` comes from the `DOM` lib, and `PORT` is read through a cast rather than the bare `process` global.
+
+The reason is `@vercel/hono`, which transpiles `src/` using a tsconfig it writes to a **temp directory** that `extends` this one. Type libraries named in `compilerOptions.types` resolve relative to the config that declares them, so from `/tmp` TypeScript searches `/tmp/node_modules` and never reaches this project's — and the build dies with `TS2688` before transpiling anything. The Hono build sets `EXPERIMENTAL_NODE_TYPESCRIPT_ERRORS=1`, which makes that fatal rather than a warning.
+
+Bun's types are still needed locally, because `tests/` import `bun:test` and call `Bun.serve`. They live in `tsconfig.typecheck.json`, which only `bun run type-check` uses:
+
+```json
+{ "extends": "./tsconfig.json", "compilerOptions": { "types": ["bun-types"] } }
+```
+
+That is why `type-check` is `bunx tsc --noEmit -p tsconfig.typecheck.json` rather than a bare `--noEmit`. Adding `"types": ["bun-types"]` back to `tsconfig.json` looks harmless and breaks the Vercel build.
+
+
 
 ### Static assets
 

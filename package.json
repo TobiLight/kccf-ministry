@@ -8,7 +8,7 @@
     "build": "bun build src/index.ts --outdir ./dist --target bun",
     "start": "bun run dist/index.js",
     "test": "bun test",
-    "type-check": "bunx tsc --noEmit",
+    "type-check": "bunx tsc --noEmit -p tsconfig.typecheck.json",
     "css:build": "bunx @tailwindcss/cli -i src/input.css -o public/static/style.css",
     "css:watch": "bunx @tailwindcss/cli -i src/input.css -o public/static/style.css --watch=always",
     "image:variants": "bun run scripts/image-variants.ts",

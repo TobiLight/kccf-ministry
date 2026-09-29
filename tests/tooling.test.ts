@@ -72,6 +72,7 @@ describe("development supervision", () => {
     for (const hostPath of [
       "./package.json",
       "./tsconfig.json",
+      "./tsconfig.typecheck.json",
       "./bun.lock",
       "./Dockerfile",
       "./docker-compose.yml",
@@ -127,6 +128,7 @@ type VercelConfig = {
   bunVersion?: string;
   installCommand?: string;
   regions?: string[];
+  framework?: string | null;
   buildCommand?: string;
   outputDirectory?: string | null;
   headers?: { source: string; headers: { key: string; value: string }[] }[];
@@ -157,6 +159,53 @@ describe("vercel deployment", () => {
     // build and serve the project as static files, so nothing invokes the fetch handler and
     // the visitor is shown the raw bundle. Do not add this key to silence that error.
     expect(config.outputDirectory).toBeUndefined();
+
+    // The framework belongs in Project Settings, and the preset there must be "hono".
+    // Setting it in vercel.json is not the fix: this project was created as a Vite app, and
+    // a stale Vite preset is what produced both symptoms. Vite's build output directory is
+    // dist, so Vercel served the dist/index.js that `bun run build` creates as the home page,
+    // and Vite builds no Hono function, so /static/* and /health both 404. A null here would
+    // select "Other" and reintroduce the same class of failure.
+    expect(config.framework).toBeUndefined();
+  });
+
+  test("keeps ambient type libraries out of tsconfig.json, because Vercel cannot resolve them", async () => {
+    const tsconfig = JSON.parse(await readProjectFile("tsconfig.json")) as {
+      compilerOptions: { types?: string[]; lib?: string[] };
+    };
+
+    // @vercel/hono transpiles src/ with a tsconfig it writes to a temp directory, extending
+    // this one. Type libraries named in compilerOptions.types resolve relative to the config
+    // that declares them, so from /tmp TypeScript walks up /tmp and never reaches this
+    // project's node_modules - and the build dies with TS2688 before it transpiles anything.
+    // An empty list is the only value that is safe in both places: it asks for nothing.
+    expect(tsconfig.compilerOptions.types, "an ambient type name here is unresolvable on Vercel").toEqual([]);
+
+    // URL is a web standard present in every runtime this site targets, so the DOM lib is
+    // where it belongs, rather than arriving as a side effect of a Bun type package.
+    expect(tsconfig.compilerOptions.lib).toContain("DOM");
+  });
+
+  test("gives the local type check the Bun types the Vercel build cannot have", async () => {
+    const manifest = JSON.parse(await readProjectFile("package.json")) as { scripts: Record<string, string> };
+    const typecheck = JSON.parse(await readProjectFile("tsconfig.typecheck.json")) as {
+      extends: string;
+      compilerOptions: { types?: string[] };
+    };
+
+    // bun-types is still needed locally: tests/ import "bun:test" and call Bun.serve. It is
+    // isolated in its own config so the Vercel transpile never inherits it.
+    expect(typecheck.extends).toBe("./tsconfig.json");
+    expect(typecheck.compilerOptions.types).toEqual(["bun-types"]);
+    expect(manifest.scripts["type-check"]).toBe("bunx tsc --noEmit -p tsconfig.typecheck.json");
+  });
+
+  test("never reaches for the process global in src/, which no longer has a type declaration", async () => {
+    const entry = await readProjectFile("src/index.ts");
+
+    // src/ is transpiled with types: [], so `process` is an undeclared identifier there and
+    // the Vercel build fails with TS2591. PORT is read through a cast instead.
+    expect(entry).not.toMatch(/(?<![.\w])process\.env/);
   });
 
   test("serves the assets from a committed public/ tree, so no build step is needed", async () => {
