@@ -69,7 +69,7 @@ const imageAssetMap = {
     src: "/static/images/hero.jpg",
     width: 2048,
     height: 1366,
-    alt: "Congregation standing together during a Sunday service",
+    alt: "Congregation worshipping with raised hands during a Sunday service",
     srcset: heroSrcset,
     sizes: "100vw",
   },

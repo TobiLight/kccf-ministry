@@ -280,7 +280,7 @@ describe("rendered accessibility contract", () => {
         expect(html).toContain('alt="A cross against the sky"');
       }
       if (path === "/") {
-        expect(html).toContain('alt="Congregation standing together during a Sunday service"');
+        expect(html).toContain('alt="Congregation worshipping with raised hands during a Sunday service"');
       }
       if (path === "/ministries") {
         expect(html).toContain('alt="Hands resting on an open Bible"');
