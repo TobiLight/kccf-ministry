@@ -45,7 +45,7 @@ function highlightActions(sermon: Sermon) {
   );
 }
 
-export function SermonsPage() {
+export function SermonsPage({ page }: { page?: number }) {
   const all = resolveSermons(sermons, snapshot);
   const playable = all.filter((sermon) => sermon.youtubeId);
   const [featured] = playable;
@@ -133,7 +133,7 @@ export function SermonsPage() {
             title="Every Recorded Message"
             description="Browse the archive by year. New recordings appear here as soon as they are published."
           />
-          <SermonArchive sermons={archive} />
+          <SermonArchive sermons={archive} page={page} />
           <div class="center-action">
             <ButtonLink
               className="button button-secondary"

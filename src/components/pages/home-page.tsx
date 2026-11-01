@@ -10,7 +10,7 @@ import { SectionHeading } from "../ui/section-heading";
 export function HomePage() {
   const heroImage = getImageAsset(site.images.hero);
   const heroSource = getResponsiveSourceSet(site.images.hero);
-  const welcomeImage = getImageAsset(site.images.prayerFellowship);
+  const welcomeImage = getImageAsset(site.images.welcomeSection);
 
   return (
     <>
@@ -67,9 +67,9 @@ export function HomePage() {
           <div class="welcome-image-wrap">
             <img
               class="editorial-image"
-              src={site.images.prayerFellowship}
-              srcset={getResponsiveSourceSet(site.images.prayerFellowship).srcset}
-              sizes={getResponsiveSourceSet(site.images.prayerFellowship).sizes}
+              src={site.images.welcomeSection}
+              srcset={getResponsiveSourceSet(site.images.welcomeSection).srcset}
+              sizes={getResponsiveSourceSet(site.images.welcomeSection).sizes}
               alt={welcomeImage?.alt}
               width={welcomeImage?.width}
               height={welcomeImage?.height}

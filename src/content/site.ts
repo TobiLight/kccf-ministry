@@ -35,7 +35,7 @@ const mobileNavItems: NavItem[] = [...navItems, { label: "Visit Us", href: "/con
 const services: ServiceTime[] = [
   { name: "Sunday Worship", time: "9:00 AM" },
   { name: "Wednesday Throne of Grace", time: "9:00 AM" },
-  { name: "Friday Prayer Meeting", time: "6:30 PM" },
+  { name: "1st Thursday of every Month - Transformation Night", time: "10:00 PM" },
 ];
 
 const aboutSrcset = [
@@ -64,6 +64,20 @@ const prayerFellowshipSrcset = [
   "/static/images/prayer-fellowship.jpg 1600w",
 ].join(", ");
 
+const welcomeSectionSrcset = [
+  "/static/images/welcome-section-640.jpg 640w",
+  "/static/images/welcome-section-1024.jpg 1024w",
+  "/static/images/welcome-section-1600.jpg 1600w",
+  "/static/images/welcome-section.jpg 4000w",
+].join(", ");
+
+const ministriesSrcset = [
+  "/static/images/ministries-640.jpg 640w",
+  "/static/images/ministries-1024.jpg 1024w",
+  "/static/images/ministries-1600.jpg 1600w",
+  "/static/images/ministries.jpg 2335w",
+].join(", ");
+
 const imageAssetMap = {
   hero: {
     src: "/static/images/hero.jpg",
@@ -79,6 +93,14 @@ const imageAssetMap = {
     height: 1066,
     alt: "A member of the congregation greeting children during a church service",
     srcset: prayerFellowshipSrcset,
+    sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
+  },
+  welcomeSection: {
+    src: "/static/images/welcome-section.jpg",
+    width: 4000,
+    height: 4000,
+    alt: "Members of the congregation worshipping during a Sunday service",
+    srcset: welcomeSectionSrcset,
     sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
   },
   logo: { src: "/static/images/logo.jpg", width: 200, height: 200, alt: "KCCF Ministries" },
@@ -99,6 +121,14 @@ const imageAssetMap = {
     sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
   },
   bibleStudy: { src: "/static/images/bible-study.jpg", width: 2048, height: 1365, alt: "Hands resting on an open Bible" },
+  ministries: {
+    src: "/static/images/ministries.jpg",
+    width: 2335,
+    height: 3500,
+    alt: "KCCF Ministries serving the community",
+    srcset: ministriesSrcset,
+    sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
+  },
   pastorOne: { src: "/static/images/pastor-1.jpg", width: 2048, height: 1365, alt: "" },
   pastorTwo: { src: "/static/images/pastor-2.jpg", width: 600, height: 800, alt: "" },
 } satisfies Record<string, ImageAsset>;
@@ -139,9 +169,11 @@ export const site = {
   images: {
     hero: imageAssets.hero.src,
     prayerFellowship: imageAssets.prayerFellowship.src,
+    welcomeSection: imageAssets.welcomeSection.src,
     about: imageAssets.about.src,
     worshipMoment: imageAssets.worshipMoment.src,
     bibleStudy: imageAssets.bibleStudy.src,
+    ministries: imageAssets.ministries.src,
     pastorOne: imageAssets.pastorOne.src,
     pastorTwo: imageAssets.pastorTwo.src,
     logo: imageAssets.logo.src

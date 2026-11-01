@@ -283,7 +283,7 @@ describe("rendered accessibility contract", () => {
         expect(html).toContain('alt="Congregation worshipping with raised hands during a Sunday service"');
       }
       if (path === "/ministries") {
-        expect(html).toContain('alt="Hands resting on an open Bible"');
+        expect(html).toContain('alt="KCCF Ministries serving the community"');
       }
       if (path === "/events") {
         expect(html).toContain('alt="A member of the congregation greeting children during a church service"');

@@ -65,8 +65,11 @@ export function configureRoutes(app: Hono): Hono {
     ),
   );
 
-  app.get("/sermons", (c) =>
-    c.html(
+  app.get("/sermons", (c) => {
+    const rawPage = c.req.query("page") ?? "";
+    const page = /^\d+$/.test(rawPage) ? Math.max(1, Number.parseInt(rawPage, 10)) : 1;
+
+    return c.html(
       renderNode(
         createElement(
           PageShell,
@@ -75,11 +78,11 @@ export function configureRoutes(app: Hono): Hono {
             description: "Explore messages from KCCF Ministries and join us live on Facebook.",
             currentPath: "/sermons",
           },
-          createElement(SermonsPage, {}),
+          createElement(SermonsPage, { page }),
         ),
       ),
-    ),
-  );
+    );
+  });
 
   app.get("/events", (c) =>
     c.html(

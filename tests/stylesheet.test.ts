@@ -381,6 +381,8 @@ describe("shipped stylesheet contract", () => {
       expect(findValue(rules, ".sermon-row", "grid-template-columns", "@media (min-width: 48rem)")).toEqual([
         "minmax(0, 1fr) auto",
       ]);
+      expect(findValue(rules, ".sermon-pagination", "display")).toEqual(["flex"]);
+      expect(findValue(rules, ".sermon-pagination-link", "text-decoration")).toEqual(["none"]);
     }
   });
 

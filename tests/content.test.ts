@@ -129,10 +129,10 @@ describe("site content", () => {
     expect("marqueeServices" in site).toBe(false);
   });
 
-  test("contains six ministries, the leadership roster, and a curated sermon archive", () => {
-    expect(ministries).toHaveLength(6);
+  test("contains five ministries, the leadership roster, and a curated sermon archive", () => {
+    expect(ministries).toHaveLength(5);
     expect(leadership.pastors).toHaveLength(2);
-    expect(leadership.ministryLeaders).toHaveLength(6);
+    expect(leadership.ministryLeaders).toHaveLength(5);
     // The curated archive is the place for sermons the YouTube feed cannot supply, so it
     // grows by hand and is legitimately allowed to be empty. Pin it to a declared value
     // rather than a literal, so adding a curated sermon is a deliberate edit here too.
@@ -948,6 +948,264 @@ describe("sermon sync safety", () => {
     await syncSermons(deps);
 
     expect(recorded.logs.join("\n")).toContain("GONEVIDEO00000");
+  });
+});
+
+describe("sermon sync via YouTube Data API v3", () => {
+  const apiKey = "test-api-key-123";
+
+  type ApiVideo = { videoId: string; title?: string; description?: string; publishedAt?: string };
+
+  function apiVideo(videoId: string, overrides: Partial<ApiVideo> = {}) {
+    return {
+      snippet: {
+        title: overrides.title ?? "KCCF Ministries Live Stream",
+        description: overrides.description ?? "18th Annual Anniversary\nTheme: Harvest Of Abundance",
+        publishedAt: overrides.publishedAt ?? "2026-09-20T13:02:55Z",
+        resourceId: { videoId },
+      },
+    };
+  }
+
+  function channelsResponse(uploadsId = "UUtestuploads0000000") {
+    return new Response(
+      JSON.stringify({
+        items: [{ contentDetails: { relatedPlaylists: { uploads: uploadsId } } }],
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }
+
+  function playlistResponse(items: ReturnType<typeof apiVideo>[], nextPageToken?: string) {
+    return new Response(
+      JSON.stringify({ items, ...(nextPageToken ? { nextPageToken } : {}) }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }
+
+  function apiHarness(
+    channelsResult: Response | Error,
+    playlistResults: Array<Response | Error>,
+    snapshotOnDisk: SnapshotRead,
+  ): { deps: Parameters<typeof syncSermons>[0]; recorded: { writes: string[]; logs: string[] } } {
+    const recorded = { writes: [] as string[], logs: [] as string[] };
+    let playlistCall = 0;
+
+    return {
+      recorded,
+      deps: {
+        fetchImpl: (async (url: string | URL | Request) => {
+          const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+
+          if (href.includes("/youtube/v3/channels")) {
+            if (channelsResult instanceof Error) throw channelsResult;
+            return channelsResult;
+          }
+
+          if (href.includes("/youtube/v3/playlistItems")) {
+            const result = playlistResults[playlistCall] ?? playlistResults[playlistResults.length - 1];
+            playlistCall++;
+            if (result instanceof Error) throw result;
+            return result;
+          }
+
+          throw new Error(`unexpected fetch to ${href}`);
+        }) as unknown as typeof fetch,
+        now: () => new Date("2026-09-26T00:00:00.000Z"),
+        readSnapshot: () => snapshotOnDisk,
+        writeSnapshot: (contents) => {
+          recorded.writes.push(contents);
+        },
+        log: (line) => {
+          recorded.logs.push(line);
+        },
+        apiKey,
+      },
+    };
+  }
+
+  test("fetches all videos from the uploads playlist via channels.list and playlistItems.list", async () => {
+    const videos = [
+      apiVideo("2zFODEV22G0", { publishedAt: "2026-09-20T13:02:55Z" }),
+      apiVideo("P2GUPgTsIuA", { publishedAt: "2026-09-20T12:52:38Z" }),
+      apiVideo("eboHWsOsGHY", { publishedAt: "2026-09-19T10:49:31Z" }),
+      apiVideo("GUup6e4Ccp0", {
+        title: "KCCF Ministries Live Stream",
+        description: "Wisdom To Receive And Retain Increase\nBishop Olayinka Adeyinka | Pastor",
+        publishedAt: "2026-09-17T09:00:00Z",
+      }),
+    ];
+    const { deps, recorded } = apiHarness(channelsResponse(), [playlistResponse(videos)], {
+      state: "absent",
+    });
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(true);
+    expect(recorded.writes).toHaveLength(1);
+
+    const written = JSON.parse(recorded.writes[0]);
+    expect(written.entries).toHaveLength(4);
+    expect(written.channelId).toBe("UCRNGCZhVNV2Pj80fs20GNog");
+  });
+
+  test("paginates through multiple playlist pages", async () => {
+    const page1 = [apiVideo("videoAAAAAA01"), apiVideo("videoAAAAAA02")];
+    const page2 = [apiVideo("videoAAAAAA03"), apiVideo("videoAAAAAA04")];
+    const { deps, recorded } = apiHarness(
+      channelsResponse(),
+      [playlistResponse(page1, "page2token"), playlistResponse(page2)],
+      { state: "absent" },
+    );
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(true);
+    const written = JSON.parse(recorded.writes[0]);
+    expect(written.entries).toHaveLength(4);
+    expect(written.entries.map((e: { youtubeId: string }) => e.youtubeId).sort()).toEqual([
+      "videoAAAAAA01",
+      "videoAAAAAA02",
+      "videoAAAAAA03",
+      "videoAAAAAA04",
+    ]);
+  });
+
+  test("refuses to write when channels.list returns a non-200", async () => {
+    const { deps, recorded } = apiHarness(
+      new Response("rate limited", { status: 429 }),
+      [playlistResponse([apiVideo("2zFODEV22G0")])],
+      { state: "absent" },
+    );
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+    expect(result.ok === false ? result.reason : "").toContain("429");
+  });
+
+  test("refuses to write when playlistItems.list returns a non-200", async () => {
+    const { deps, recorded } = apiHarness(
+      channelsResponse(),
+      [new Response("quota exceeded", { status: 403 })],
+      { state: "absent" },
+    );
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+    expect(result.ok === false ? result.reason : "").toContain("403");
+  });
+
+  test("refuses to write when the network throws", async () => {
+    const { deps, recorded } = apiHarness(new Error("network down"), [], { state: "absent" });
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+    expect(result.ok === false ? result.reason : "").toContain("network down");
+  });
+
+  test("refuses to write when channels.list returns no uploads playlist", async () => {
+    const noUploads = new Response(
+      JSON.stringify({ items: [{ contentDetails: { relatedPlaylists: {} } }] }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+    const { deps, recorded } = apiHarness(noUploads, [], { state: "absent" });
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+    expect(result.ok === false ? result.reason : "").toContain("uploads playlist");
+  });
+
+  test("refuses to write when the uploads playlist is empty", async () => {
+    const { deps, recorded } = apiHarness(channelsResponse(), [playlistResponse([])], {
+      state: "absent",
+    });
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+    expect(result.ok === false ? result.reason : "").toContain("no videos");
+  });
+
+  test("refuses to write when the API returns a malformed video id", async () => {
+    const badVideo = apiVideo("bad id!!!");
+    const { deps, recorded } = apiHarness(channelsResponse(), [playlistResponse([badVideo])], {
+      state: "absent",
+    });
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+    expect(result.ok === false ? result.reason : "").toContain("malformed video id");
+  });
+
+  test("keeps existing entries when unioning via the API", async () => {
+    const existing = JSON.stringify({
+      generatedAt: "2026-09-01T00:00:00.000Z",
+      channelId: "UCRNGCZhVNV2Pj80fs20GNog",
+      entries: [
+        {
+          youtubeId: "OLDVIDEO00000",
+          title: "A sermon older than the feed window",
+          speaker: "Bishop Olayinka Adeyinka",
+          publishedAt: "2025-01-05",
+          partIndex: 1,
+          partCount: 1,
+          needsCuration: false,
+        },
+      ],
+    });
+    const { deps, recorded } = apiHarness(
+      channelsResponse(),
+      [playlistResponse([apiVideo("2zFODEV22G0"), apiVideo("NEWVIDEO00001")])],
+      { state: "ok", contents: existing },
+    );
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(true);
+    const written = JSON.parse(recorded.writes[0]);
+    expect(written.entries).toHaveLength(3);
+    expect(written.entries.some((e: { youtubeId: string }) => e.youtubeId === "OLDVIDEO00000")).toBe(true);
+    expect(written.entries.some((e: { youtubeId: string }) => e.youtubeId === "NEWVIDEO00001")).toBe(true);
+  });
+
+  test("reports the API as the source in the log", async () => {
+    const { deps, recorded } = apiHarness(
+      channelsResponse(),
+      [playlistResponse([apiVideo("2zFODEV22G0")])],
+      { state: "absent" },
+    );
+
+    await syncSermons(deps);
+    const report = recorded.logs.join("\n");
+
+    expect(report).toContain("YouTube Data API v3");
+    expect(report).toContain("fetched");
+    expect(report).toContain("newly added");
+  });
+
+  test("refuses to write when the committed snapshot is unreadable, same as RSS path", async () => {
+    const { deps, recorded } = apiHarness(
+      channelsResponse(),
+      [playlistResponse([apiVideo("2zFODEV22G0")])],
+      { state: "error", reason: "EACCES: permission denied" },
+    );
+
+    const result = await syncSermons(deps);
+
+    expect(result.ok).toBe(false);
+    expect(recorded.writes).toHaveLength(0);
+    expect(result.ok === false ? result.reason : "").toContain("EACCES");
   });
 });
 

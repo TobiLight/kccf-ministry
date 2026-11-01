@@ -9,6 +9,12 @@ import { canonicalAddress } from "./content.test";
 
 const renderedPastTitles = pastEvents.map((event) => event.title.replace(/'/g, "&#39;"));
 
+const archivePageSize = 15;
+
+function archiveRows(html: string) {
+  return [...html.matchAll(/<article class="sermon-row[\s\S]*?<\/article>/g)].map((match) => match[0]);
+}
+
 async function getPage(path: string) {
   const response = await createApp().request(path);
   const html = await response.text();
@@ -47,7 +53,8 @@ describe("home page", () => {
     expect(html).toContain("Wednesday Throne of Grace");
     expect(html).toContain("Friday Prayer Meeting");
     expect(html).toContain("Prayer Fellowship");
-    expect(html).toContain("Bible Study");
+    expect(html).toContain("KCCF Choir");
+    expect(html).toContain("Teens Church");
     expect(html).toContain("Bishop Olayinka Adeyinka");
     expect(html).toContain("Pastor David Bodunrin");
     expect(html).toContain("I AM Revival");
@@ -97,20 +104,19 @@ describe("about page", () => {
 });
 
 describe("ministries page", () => {
-  test("renders all six typed ministry entries and the contact CTA", async () => {
+  test("renders all five typed ministry entries and the contact CTA", async () => {
     const { html, main } = await getPage("/ministries");
 
     expectInOrder(main, [
       "Our Ministries",
-      "Worship",
+      "KCCF Choir",
       "Prayer Fellowship",
-      "Bible Study",
-      "Children",
-      "Youth Fellowship",
-      "Community Outreach",
+      "Teens Church",
+      "KCCF Youths",
+      "KCCF Media",
       "Contact Us",
     ]);
-    expect((html.match(/<article class="ministry-entry/g) ?? [])).toHaveLength(6);
+    expect((html.match(/<article class="ministry-entry/g) ?? [])).toHaveLength(5);
     expect(html).toContain("A room for heartfelt praise");
   });
 });
@@ -126,7 +132,7 @@ describe("sermons page", () => {
 
   test("builds every highlight card from a real recorded message, one per sermon", async () => {
     const { html } = await getPage("/sermons");
-    const cards = [...html.matchAll(/<article class="card sermon-card">([\s\S]*?)<\/article>/g)].map((m) => m[1]);
+    const cards = [...html.matchAll(/<article class="card sermon-card[^>]*>([\s\S]*?)<\/article>/g)].map((m) => m[1]);
 
     expect(cards.length).toBeGreaterThan(0);
 
@@ -151,7 +157,7 @@ describe("sermons page", () => {
 
   test("never shows the same sermon twice across the highlight row", async () => {
     const { html } = await getPage("/sermons");
-    const titles = [...html.matchAll(/<article class="card sermon-card">[\s\S]*?<h3>([^<]+)<\/h3>/g)].map((m) => m[1]);
+    const titles = [...html.matchAll(/<article class="card sermon-card[^>]*>[\s\S]*?<h3>([^<]+)<\/h3>/g)].map((m) => m[1]);
 
     expect(titles.length).toBeGreaterThan(0);
 
@@ -160,7 +166,7 @@ describe("sermons page", () => {
 
   test("gives every highlight card a play control and a no-javascript link", async () => {
     const { html } = await getPage("/sermons");
-    const cards = [...html.matchAll(/<article class="card sermon-card">([\s\S]*?)<\/article>/g)].map((m) => m[1]);
+    const cards = [...html.matchAll(/<article class="card sermon-card[^>]*>([\s\S]*?)<\/article>/g)].map((m) => m[1]);
 
     for (const card of cards) {
       expect(card).toMatch(/class="sermon-row-play"/);
@@ -183,7 +189,10 @@ describe("sermons page", () => {
     expect(liveBanner).toContain('<div class="live-banner-mark" aria-hidden="true">');
     expect(liveBanner).toContain("<svg");
     expect(liveBanner).not.toContain(">f</div>");
-    expect(html).not.toContain("Sermon archive");
+    // The old filler "Sermon archive" prose must stay gone; matching element text
+    // only, so the pagination nav may still carry "Sermon archive pagination"
+    // as its accessible name.
+    expect(html).not.toMatch(/>Sermon archive/);
     expect(html).not.toContain("sermon-date-note");
   });
 
@@ -293,9 +302,15 @@ describe("sermons page", () => {
   });
 
   test("flags a curation row only for the archive entries that still need curating", async () => {
-    const { html } = await getPage("/sermons");
-    const rows = [...html.matchAll(/<article class="sermon-row[\s\S]*?<\/article>/g)].map((match) => match[0]);
     const archive = resolveSermons(sermons, snapshot).filter((sermon) => sermon.youtubeId || sermon.facebookUrl);
+    const pageCount = Math.ceil(archive.length / archivePageSize);
+    const rows: string[] = [];
+
+    for (let page = 1; page <= pageCount; page += 1) {
+      const { html } = await getPage(page === 1 ? "/sermons" : `/sermons?page=${page}`);
+      rows.push(...archiveRows(html));
+    }
+
     const flagged = new Set(
       archive.filter((sermon) => sermon.needsCuration).map((sermon) => sermon.youtubeId),
     );
@@ -346,6 +361,78 @@ describe("sermons page", () => {
     expect(featuredTitle).toBeDefined();
     expect(firstRowTitle).toBeDefined();
     expect(featuredTitle).toBe(firstRowTitle);
+  });
+
+  test("shows only the 15 latest recordings in the archive by default", async () => {
+    const { html } = await getPage("/sermons");
+    const rows = archiveRows(html);
+    const archive = resolveSermons(sermons, snapshot).filter((sermon) => sermon.youtubeId || sermon.facebookUrl);
+    const latest = archive.slice(0, archivePageSize);
+
+    expect(archive.length).toBeGreaterThan(archivePageSize);
+    expect(rows).toHaveLength(archivePageSize);
+
+    for (const [index, row] of rows.entries()) {
+      expect(row).toContain(latest[index].title.replace(/'/g, "&#39;"));
+    }
+  });
+
+  test("lists the remaining recordings on later pages", async () => {
+    const archive = resolveSermons(sermons, snapshot).filter((sermon) => sermon.youtubeId || sermon.facebookUrl);
+    const secondPage = archive.slice(archivePageSize);
+    const { html } = await getPage("/sermons?page=2");
+    const rows = archiveRows(html);
+
+    expect(secondPage.length).toBeGreaterThan(0);
+    expect(rows).toHaveLength(secondPage.length);
+
+    for (const [index, row] of rows.entries()) {
+      expect(row).toContain(secondPage[index].title.replace(/'/g, "&#39;"));
+    }
+  });
+
+  test("links between pages with plain hrefs and marks the current page", async () => {
+    const { html } = await getPage("/sermons");
+    const nav = html.match(/<nav[^>]*class="sermon-pagination"[^>]*>[\s\S]*?<\/nav>/)?.[0];
+
+    expect(nav).toBeDefined();
+    expect(nav).toContain('aria-label="Sermon archive pagination"');
+    expect(nav).toContain('href="/sermons?page=2"');
+    expect(nav).not.toContain('href="/sermons?page=1"');
+    expect(nav).toMatch(/<a[^>]*href="\/sermons"[^>]*aria-current="page"[^>]*>1<\/a>/);
+
+    const pageTwo = await getPage("/sermons?page=2");
+    const pageTwoNav = pageTwo.html.match(/<nav[^>]*class="sermon-pagination"[^>]*>[\s\S]*?<\/nav>/)?.[0];
+
+    expect(pageTwoNav).toBeDefined();
+    expect(pageTwoNav).toContain('href="/sermons"');
+    expect(pageTwoNav).toMatch(/<a[^>]*href="\/sermons\?page=2"[^>]*aria-current="page"[^>]*>2<\/a>/);
+  });
+
+  test("treats an unusable page parameter as the first page", async () => {
+    const { html: defaultHtml } = await getPage("/sermons");
+    const defaultRows = archiveRows(defaultHtml);
+
+    for (const query of ["?page=0", "?page=-3", "?page=abc", "?page="]) {
+      const { html } = await getPage(`/sermons${query}`);
+      const rows = archiveRows(html);
+      const nav = html.match(/<nav[^>]*class="sermon-pagination"[^>]*>[\s\S]*?<\/nav>/)?.[0];
+
+      expect(rows).toHaveLength(defaultRows.length);
+      expect(rows[0]).toBe(defaultRows[0]);
+      expect(nav).toMatch(/<a[^>]*href="\/sermons"[^>]*aria-current="page"[^>]*>1<\/a>/);
+    }
+  });
+
+  test("clamps a page past the end to the last page", async () => {
+    const archive = resolveSermons(sermons, snapshot).filter((sermon) => sermon.youtubeId || sermon.facebookUrl);
+    const lastPageRows = archive.slice(archivePageSize);
+    const { html } = await getPage("/sermons?page=99");
+    const rows = archiveRows(html);
+    const nav = html.match(/<nav[^>]*class="sermon-pagination"[^>]*>[\s\S]*?<\/nav>/)?.[0];
+
+    expect(rows).toHaveLength(lastPageRows.length);
+    expect(nav).toMatch(/<a[^>]*href="\/sermons\?page=2"[^>]*aria-current="page"[^>]*>2<\/a>/);
   });
 
 });
@@ -432,12 +519,15 @@ describe("leadership page", () => {
       "Resident Pastor",
       "Pastor David Bodunrin",
       "Ministry Leaders",
-      "Worship Director",
-      "Outreach Coordinator",
+      "Choir Director",
+      "Teens Church Lead",
+      "Youths Lead",
+      "Prayer Fellowship Lead",
+      "Media Director",
       "Get in Touch",
     ]);
     expect((html.match(/<article class="pastoral-card"/g) ?? [])).toHaveLength(2);
-    expect((html.match(/<article class="leadership-card"/g) ?? [])).toHaveLength(6);
+    expect((html.match(/<article class="leadership-card"/g) ?? [])).toHaveLength(5);
     expect(html).toContain("biblical truth");
     expect(html).toContain("pastoral care");
     expect(html).toContain("pastor-1.jpg");
@@ -448,7 +538,7 @@ describe("leadership page", () => {
     const { html } = await getPage("/leadership");
     const leaderImages = [...html.matchAll(/<img[^>]*class="leadership-card-image"[^>]*>/g)].map((match) => match[0]);
 
-    expect(leaderImages).toHaveLength(6);
+    expect(leaderImages).toHaveLength(5);
     for (const image of leaderImages) {
       const alt = image.match(/alt="([^"]*)"/)?.[1];
       expect(alt).toBeTruthy();

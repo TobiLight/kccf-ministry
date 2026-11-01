@@ -1968,6 +1968,46 @@ section {
   }
 }
 
+.sermon-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 2.5rem;
+}
+
+.sermon-pagination-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sermon-pagination-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 2.4rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sermon-pagination-link[aria-current="page"] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-warm-black);
+}
+
+.sermon-pagination-link:focus-visible {
+  outline: 0.2rem solid var(--color-primary-strong);
+  outline-offset: 0.2rem;
+}
+
 .sermon-card-actions {
   display: flex;
   flex-wrap: wrap;

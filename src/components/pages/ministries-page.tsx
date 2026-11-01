@@ -11,7 +11,7 @@ export function MinistriesPage() {
         eyebrow="Use your gifts"
         title="Our Ministries"
         description="There is a meaningful way for every person to worship, serve, learn, and belong."
-        image={site.images.bibleStudy}
+        image={site.images.ministries}
       />
 
       <section class="ministries-intro-section section-cream">

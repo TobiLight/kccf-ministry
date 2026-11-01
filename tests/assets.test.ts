@@ -12,6 +12,8 @@ const imageFiles = [
   "pastor-1.jpg",
   "pastor-2.jpg",
   "logo.jpg",
+  "welcome-section.jpg",
+  "ministries.jpg",
 ] as const;
 
 const generatedVariants = [
@@ -26,6 +28,12 @@ const generatedVariants = [
   { file: "worship-moment-1024.jpg", width: 1024 },
   { file: "prayer-fellowship-640.jpg", width: 640 },
   { file: "prayer-fellowship-1024.jpg", width: 1024 },
+  { file: "welcome-section-640.jpg", width: 640 },
+  { file: "welcome-section-1024.jpg", width: 1024 },
+  { file: "welcome-section-1600.jpg", width: 1600 },
+  { file: "ministries-640.jpg", width: 640 },
+  { file: "ministries-1024.jpg", width: 1024 },
+  { file: "ministries-1600.jpg", width: 1600 },
 ] as const;
 
 const aboutVariants = generatedVariants.filter((variant) => variant.file.startsWith("about-"));

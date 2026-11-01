@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import {
   buildSnapshot,
+  FeedError,
   isVideoId,
   parseFeed,
   type RawFeedEntry,
@@ -24,6 +25,7 @@ export type SyncDeps = {
   readSnapshot: () => SnapshotRead;
   writeSnapshot: (contents: string) => void;
   log: (line: string) => void;
+  apiKey?: string;
 };
 
 export type SyncResult =
@@ -87,6 +89,113 @@ function parseExisting(read: SnapshotRead): ExistingSnapshot {
   return { state: "valid", snapshot: parsed as SermonSnapshot };
 }
 
+type ApiPlaylistItem = {
+  snippet: {
+    title: string;
+    description: string;
+    publishedAt: string;
+    resourceId: { videoId: string };
+  };
+};
+
+type ApiPlaylistItemsResponse = {
+  items?: ApiPlaylistItem[];
+  nextPageToken?: string;
+};
+
+type ApiChannelsResponse = {
+  items?: Array<{
+    contentDetails: {
+      relatedPlaylists: {
+        uploads: string;
+      };
+    };
+  }>;
+};
+
+async function fetchFromApi(
+  channelId: string,
+  apiKey: string,
+  fetchImpl: typeof fetch,
+): Promise<RawFeedEntry[]> {
+  const channelsUrl = new URL("https://www.googleapis.com/youtube/v3/channels");
+  channelsUrl.searchParams.set("part", "contentDetails");
+  channelsUrl.searchParams.set("id", channelId);
+  channelsUrl.searchParams.set("key", apiKey);
+
+  const channelsResponse = await fetchImpl(channelsUrl.toString());
+
+  if (!channelsResponse.ok) {
+    throw new FeedError(
+      `channels.list responded ${channelsResponse.status}, so the uploads playlist cannot be resolved`,
+    );
+  }
+
+  const channelsData = (await channelsResponse.json()) as ApiChannelsResponse;
+  const uploadsId = channelsData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+
+  if (!uploadsId) {
+    throw new FeedError(
+      `channels.list returned no uploads playlist for channel ${channelId}, so the channel is wrong or empty`,
+    );
+  }
+
+  const entries: RawFeedEntry[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const playlistUrl = new URL("https://www.googleapis.com/youtube/v3/playlistItems");
+    playlistUrl.searchParams.set("part", "snippet");
+    playlistUrl.searchParams.set("playlistId", uploadsId);
+    playlistUrl.searchParams.set("maxResults", "50");
+    playlistUrl.searchParams.set("key", apiKey);
+    if (pageToken) {
+      playlistUrl.searchParams.set("pageToken", pageToken);
+    }
+
+    const playlistResponse = await fetchImpl(playlistUrl.toString());
+
+    if (!playlistResponse.ok) {
+      throw new FeedError(
+        `playlistItems.list responded ${playlistResponse.status} on page ${pageToken ?? "1"}`,
+      );
+    }
+
+    const playlistData = (await playlistResponse.json()) as ApiPlaylistItemsResponse;
+
+    for (const item of playlistData.items ?? []) {
+      const videoId = item.snippet.resourceId.videoId;
+
+      if (!videoId) {
+        continue;
+      }
+
+      if (!isVideoId(videoId)) {
+        throw new FeedError(
+          `the API returned the malformed video id ${JSON.stringify(videoId)}, so it is broken or hostile and nothing was ingested`,
+        );
+      }
+
+      entries.push({
+        youtubeId: videoId,
+        title: item.snippet.title,
+        published: item.snippet.publishedAt,
+        description: item.snippet.description,
+      });
+    }
+
+    pageToken = playlistData.nextPageToken;
+  } while (pageToken);
+
+  if (entries.length === 0) {
+    throw new FeedError(
+      `the uploads playlist for channel ${channelId} has no videos, so the channel is wrong or empty`,
+    );
+  }
+
+  return entries;
+}
+
 export async function syncSermons(deps: SyncDeps): Promise<SyncResult> {
   const { channelId, channelUrl } = site.youtube;
   const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
@@ -96,30 +205,41 @@ export async function syncSermons(deps: SyncDeps): Promise<SyncResult> {
     deps.log(line);
   };
 
-  let xml: string;
-
-  try {
-    const response = await deps.fetchImpl(feedUrl, { headers: { accept: "application/atom+xml" } });
-
-    if (!response.ok) {
-      return { ok: false, reason: `feed responded ${response.status}` };
-    }
-
-    xml = await response.text();
-  } catch (error) {
-    return { ok: false, reason: `feed request failed: ${(error as Error).message}` };
-  }
+  const useApi = Boolean(deps.apiKey);
+  const source = useApi ? "YouTube Data API v3" : "Atom feed";
 
   let raw: RawFeedEntry[];
 
-  try {
-    raw = parseFeed(xml);
-  } catch (error) {
-    return { ok: false, reason: (error as Error).message };
-  }
+  if (useApi && deps.apiKey) {
+    try {
+      raw = await fetchFromApi(channelId, deps.apiKey, deps.fetchImpl);
+    } catch (error) {
+      return { ok: false, reason: (error as Error).message };
+    }
+  } else {
+    let xml: string;
 
-  if (!xml.includes(channelId)) {
-    return { ok: false, reason: `feed does not mention channel ${channelId}` };
+    try {
+      const response = await deps.fetchImpl(feedUrl, { headers: { accept: "application/atom+xml" } });
+
+      if (!response.ok) {
+        return { ok: false, reason: `feed responded ${response.status}` };
+      }
+
+      xml = await response.text();
+    } catch (error) {
+      return { ok: false, reason: `feed request failed: ${(error as Error).message}` };
+    }
+
+    try {
+      raw = parseFeed(xml);
+    } catch (error) {
+      return { ok: false, reason: (error as Error).message };
+    }
+
+    if (!xml.includes(channelId)) {
+      return { ok: false, reason: `feed does not mention channel ${channelId}` };
+    }
   }
 
   const read = deps.readSnapshot();
@@ -143,8 +263,13 @@ export async function syncSermons(deps: SyncDeps): Promise<SyncResult> {
   deps.writeSnapshot(`${JSON.stringify(next, null, 2)}\n`);
 
   log(`sermons:sync  ${channelId} (${site.name})`);
-  log(`  feed          ${feedUrl}`);
-  log(`  channel       ${channelUrl}`);
+  log(`  source        ${source}`);
+  if (useApi) {
+    log(`  channel       ${channelUrl}`);
+  } else {
+    log(`  feed          ${feedUrl}`);
+    log(`  channel       ${channelUrl}`);
+  }
   log(`  fetched       ${raw.length} entries`);
   log(`  already known ${existingIds.size} entries`);
   log(`  newly added   ${added.length}`);
@@ -194,6 +319,7 @@ async function main() {
   }
 
   let pending: string | null = null;
+  const apiKey = process.env.YOUTUBE_API_KEY;
   const result = await syncSermons({
     fetchImpl: fetch,
     now: () => new Date(),
@@ -202,6 +328,7 @@ async function main() {
       pending = contents;
     },
     log: (line) => console.log(line),
+    ...(apiKey ? { apiKey } : {}),
   });
 
   if (!result.ok) {
