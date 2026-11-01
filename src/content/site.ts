@@ -1,6 +1,6 @@
 import type { ContactInfo, ImageAsset, NavItem, ServiceTime, SocialLink, YoutubeChannel } from "./types";
 
-const address = "13-17 Taiwo Akinsulire Street, Off Taiwo Ajakaiye Street, Foursquare bus stop, Ikotun-Ikosi Road, Ikotun, Lagos, Nigeria";
+const address = "13 Taiwo Akinsuli street, Ikotun, Lagos 102213, Lagos";
 
 const googleMapsSearchUrl = (query: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 
@@ -33,9 +33,10 @@ const navItems: NavItem[] = [
 const mobileNavItems: NavItem[] = [...navItems, { label: "Visit Us", href: "/contact#visit-us" }];
 
 const services: ServiceTime[] = [
+  { name: "Sunday School", time: "8:00 AM" },
   { name: "Sunday Worship", time: "9:00 AM" },
   { name: "Wednesday Throne of Grace", time: "9:00 AM" },
-  { name: "1st Thursday of every Month - Transformation Night", time: "10:00 PM" },
+  { name: "New Mooon - Transformation Night", time: "10:00 PM" },
 ];
 
 const aboutSrcset = [
@@ -43,6 +44,13 @@ const aboutSrcset = [
   "/static/images/about-1024.jpg 1024w",
   "/static/images/about-1600.jpg 1600w",
   "/static/images/about-2400.jpg 2400w",
+].join(", ");
+
+const contactSrcset = [
+  "/static/images/kccflogo-640.jpg 640w",
+  "/static/images/kccflogo-1024.jpg 1024w",
+  "/static/images/kccflogo-1600.jpg 1600w",
+  "/static/images/kccflogo-2400.jpg 2400w",
 ].join(", ");
 
 const heroSrcset = [
@@ -112,6 +120,14 @@ const imageAssetMap = {
     srcset: aboutSrcset,
     sizes: "(min-width: 64rem) 40rem, (min-width: 48rem) 38vw, 92vw",
   },
+  contact: {
+    src: "/static/images/kccflogo.jpg",
+    width: 4389,
+    height: 3292,
+    alt: "Kingdom Covenant of Christ Fellowship Logo",
+    srcset: contactSrcset,
+    sizes: "(min-width: 64rem) 40rem, (min-width: 48rem) 38vw, 92vw",
+  },
   worshipMoment: {
     src: "/static/images/worship-moment.jpg",
     width: 1600,
@@ -176,7 +192,8 @@ export const site = {
     ministries: imageAssets.ministries.src,
     pastorOne: imageAssets.pastorOne.src,
     pastorTwo: imageAssets.pastorTwo.src,
-    logo: imageAssets.logo.src
+    logo: imageAssets.logo.src,
+    contact: imageAssets.contact.src,
   },
   imageAssets,
 };
