@@ -1,7 +1,7 @@
 import type { ChurchEvent, ServiceTime } from "./types";
 
 export const monthlyService: ServiceTime = {
-  name: "Every 1st Thursday Transformation Night",
+  name: "New Moon - Transformation Night",
   time: "10:00 PM",
 };
 
