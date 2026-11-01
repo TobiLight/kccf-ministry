@@ -86,6 +86,30 @@ const ministriesSrcset = [
   "/static/images/ministries.jpg 2335w",
 ].join(", ");
 
+const pastorAbimbolaSrcset = [
+  "/static/images/pastor_abimbola-640.jpg 640w",
+  "/static/images/pastor_abimbola-1024.jpg 1024w",
+  "/static/images/pastor_abimbola.jpg 1600w",
+].join(", ");
+
+const pastorIfeanyiSrcset = [
+  "/static/images/pastor_ifeanyi-640.jpg 640w",
+  "/static/images/pastor_ifeanyi-1024.jpg 1024w",
+  "/static/images/pastor_ifeanyi.jpg 1600w",
+].join(", ");
+
+const pastorFemiSrcset = [
+  "/static/images/brother_femi-640.jpg 640w",
+  "/static/images/brother_femi-1024.jpg 1024w",
+  "/static/images/brother_femi.jpg 1600w",
+].join(", ");
+
+const brotherFemiSrcset = [
+  "/static/images/brother_femi-640.jpg 640w",
+  "/static/images/brother_femi-1024.jpg 1024w",
+  "/static/images/brother_femi.jpg 1600w",
+].join(", ");
+
 const imageAssetMap = {
   hero: {
     src: "/static/images/hero.jpg",
@@ -120,6 +144,10 @@ const imageAssetMap = {
     srcset: aboutSrcset,
     sizes: "(min-width: 64rem) 40rem, (min-width: 48rem) 38vw, 92vw",
   },
+  pastorAbimbola: { src: "/static/images/pastor_abimbola.jpg", width: 600, height: 800, alt: "Pastor Mrs Abimbola Adeyinka", srcset: pastorAbimbolaSrcset, sizes: "(min-width: 64rem) 40rem, (min-width: 48rem) 38vw, 92vw" },
+  pastorIfeanyi: { src: "/static/images/pastor_ifeanyi.jpg", width: 600, height: 800, alt: "Pastor Ifeanyi", srcset: pastorIfeanyiSrcset, sizes: "(min-width: 64rem) 40rem, (min-width: 48rem) 38vw, 92vw" },
+  pastorFemi: { src: "/static/images/pastor_femi.jpg", width: 600, height: 800, alt: "Brother Femi", srcset: pastorFemiSrcset, sizes: "(min-width: 64rem) 40rem, (min-width: 48rem) 38vw, 92vw" },
+  brotherFemi: { src: "/static/images/brother_femi.jpg", width: 600, height: 800, alt: "Brother Femi", srcset: brotherFemiSrcset, sizes: "(min-width: 64rem) 40rem, (min-width: 48rem) 38vw, 92vw" },
   contact: {
     src: "/static/images/kccflogo.jpg",
     width: 4389,
@@ -194,6 +222,10 @@ export const site = {
     pastorTwo: imageAssets.pastorTwo.src,
     logo: imageAssets.logo.src,
     contact: imageAssets.contact.src,
+    pastorAbimbola: imageAssets.pastorAbimbola.src,
+    pastorIfeanyi: imageAssets.pastorIfeanyi.src,
+    pastorFemi: imageAssets.pastorFemi.src,
+    brotherFemi: imageAssets.brotherFemi.src,
   },
   imageAssets,
 };
