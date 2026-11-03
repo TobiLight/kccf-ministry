@@ -36,7 +36,7 @@ const services: ServiceTime[] = [
   { name: "Sunday School", time: "8:00 AM" },
   { name: "Sunday Worship", time: "9:00 AM" },
   { name: "Wednesday Throne of Grace", time: "9:00 AM" },
-  { name: "New Mooon - Transformation Night", time: "10:00 PM" },
+  { name: "Every 1st Thursday - Transformation Night", time: "10:00 PM" },
 ];
 
 const aboutSrcset = [
@@ -110,6 +110,20 @@ const brotherFemiSrcset = [
   "/static/images/brother_femi.jpg 1600w",
 ].join(", ");
 
+const leadershipSrcset = [
+  "/static/images/leadership-640.jpg 640w",
+  "/static/images/leadership-1024.jpg 1024w",
+  "/static/images/leadership-1600.jpg 1600w",
+  "/static/images/leadership.jpg 2048w",
+].join(", ");
+
+const sermonsSrcset = [
+  "/static/images/bishop1-640.jpg 640w",
+  "/static/images/bishop1-1024.jpg 1024w",
+  "/static/images/bishop1-1600.jpg 1600w",
+  "/static/images/bishop1.jpg 2048w",
+].join(", ");
+
 const imageAssetMap = {
   hero: {
     src: "/static/images/hero.jpg",
@@ -175,6 +189,22 @@ const imageAssetMap = {
   },
   pastorOne: { src: "/static/images/pastor-1.jpg", width: 2048, height: 1365, alt: "" },
   pastorTwo: { src: "/static/images/pastor-2.jpg", width: 600, height: 800, alt: "" },
+  leadership: {
+    src: "/static/images/leadership.jpg",
+    width: 2048,
+    height: 1365,
+    alt: "Bishop Adeyinka",
+    srcset: leadershipSrcset,
+    sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
+  },
+  sermon: {
+    src: "/static/images/bishop1.jpg",
+    width: 2048,
+    height: 1365,
+    alt: "Bishop Adeyinka preaching during a Sunday service",
+    srcset: sermonsSrcset,
+    sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
+  },
 } satisfies Record<string, ImageAsset>;
 
 export const imageAssets: Record<keyof typeof imageAssetMap, ImageAsset> = imageAssetMap;
@@ -226,6 +256,8 @@ export const site = {
     pastorIfeanyi: imageAssets.pastorIfeanyi.src,
     pastorFemi: imageAssets.pastorFemi.src,
     brotherFemi: imageAssets.brotherFemi.src,
+    leadership: imageAssets.leadership.src,
+    sermon: imageAssets.sermon.src,
   },
   imageAssets,
 };

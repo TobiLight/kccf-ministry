@@ -12,7 +12,7 @@ export function LeadershipPage() {
         eyebrow="Servant leaders"
         title="Our Leadership"
         description="Our leaders shepherd with wisdom, prayer, and a sincere love for people."
-        image={site.images.prayerFellowship}
+        image={site.images.leadership}
       />
 
       <section class="pastoral-section section-cream" aria-labelledby="pastoral-section-title">

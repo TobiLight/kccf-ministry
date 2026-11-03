@@ -58,7 +58,7 @@ export function SermonsPage({ page }: { page?: number }) {
         eyebrow="Messages"
         title="Sermons"
         description="Feed your faith with messages that speak to the ordinary and extraordinary places where you live."
-        image={site.images.worshipMoment}
+        image={site.images.sermon}
       />
 
       <section class="live-banner-section">

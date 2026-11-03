@@ -7,7 +7,7 @@ export const ministries: Ministry[] = [
     image: "/static/images/choir.jpg",
   },
   {
-    name: "KCCF Ushering",
+    name: "KCCF Ushers",
     description: "A team of friendly faces welcoming and serving the congregation with warmth and care.",
     image: "/static/images/ushers.jpg",
   },
@@ -31,4 +31,9 @@ export const ministries: Ministry[] = [
     description: "Capturing and sharing the message through creative media, livestream, and digital storytelling.",
     image: "/static/images/ministries.jpg",
   },
+  {
+    name: "KCCF Women",
+    description: "",
+    image: "/static/images/kccf_women.jpg"
+  }
 ];

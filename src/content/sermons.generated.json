@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-31T08:17:57.340Z",
+  "generatedAt": "2026-11-02T17:01:19.399Z",
   "channelId": "UCRNGCZhVNV2Pj80fs20GNog",
   "entries": [
     {
@@ -39,6 +39,15 @@
       "needsCuration": true
     },
     {
+      "youtubeId": "Ap5YLwQNvV4",
+      "title": "Sunday Service",
+      "speaker": null,
+      "publishedAt": "2026-11-01",
+      "partIndex": 5,
+      "partCount": 5,
+      "needsCuration": true
+    },
+    {
       "youtubeId": "AwZ0iYA2m-Y",
       "title": "Sunday Service",
       "speaker": null,
@@ -63,6 +72,15 @@
       "publishedAt": "2026-09-16",
       "partIndex": 1,
       "partCount": 6,
+      "needsCuration": true
+    },
+    {
+      "youtubeId": "fMqFb1arZiM",
+      "title": "Sermon: Seven Laws Of Prosperity By Bishop Olayinka Adeyinka",
+      "speaker": null,
+      "publishedAt": "2026-11-01",
+      "partIndex": 2,
+      "partCount": 2,
       "needsCuration": true
     },
     {
@@ -138,6 +156,15 @@
       "needsCuration": true
     },
     {
+      "youtubeId": "sYPD1BXXAt4",
+      "title": "Sermon: Seven Laws Of Prosperity By Bishop Olayinka Adeyinka",
+      "speaker": null,
+      "publishedAt": "2026-11-01",
+      "partIndex": 1,
+      "partCount": 2,
+      "needsCuration": true
+    },
+    {
       "youtubeId": "UsRHxObdoUo",
       "title": "Praise Night",
       "speaker": null,
@@ -162,6 +189,15 @@
       "publishedAt": "2026-09-16",
       "partIndex": 3,
       "partCount": 6,
+      "needsCuration": true
+    },
+    {
+      "youtubeId": "xozFiphUaTw",
+      "title": "Revival:",
+      "speaker": null,
+      "publishedAt": "2026-11-01",
+      "partIndex": 1,
+      "partCount": 1,
       "needsCuration": true
     },
     {

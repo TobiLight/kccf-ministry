@@ -453,7 +453,7 @@ describe("events page", () => {
       "Christmas Service",
       "Past Events",
     ]);
-    expect(html).toContain("New Moon - Transformation Night");
+    expect(html).toContain("Every 1st Thursday - Transformation Night");
     expect(html).toContain("10:00 PM");
     expect(html).not.toContain("Weekly gathering");
   });
