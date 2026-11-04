@@ -22,7 +22,7 @@ export function SiteFooter() {
           <div class="social-links">
             {site.social.map((social) => (
               <a href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label}>
-                <Icon name="facebook" size={18} />
+                <Icon name={social.icon} size={18} />
               </a>
             ))}
           </div>

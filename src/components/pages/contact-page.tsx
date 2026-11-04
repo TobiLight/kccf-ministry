@@ -71,17 +71,19 @@ export function ContactPage() {
                   <a href={`mailto:${site.contact.email}`}>{site.contact.email}</a>
                 </div>
               </div>
-              <div class="contact-info-item">
-                <span class="contact-info-icon">
-                  <Icon name="facebook" size={20} />
-                </span>
-                <div>
-                  <p class="eyebrow text-primary!">Facebook</p>
-                  <ButtonLink className="text-link" href={site.contact.facebookUrl} external icon="facebook">
-                    @kccfministries
-                  </ButtonLink>
+              {site.social.map((social) => (
+                <div class="contact-info-item">
+                  <span class="contact-info-icon">
+                    <Icon name={social.icon} size={20} />
+                  </span>
+                  <div>
+                    <p class="eyebrow text-primary!">{social.label}</p>
+                    <ButtonLink className="text-link" href={social.href} external icon={social.icon}>
+                      {social.handle}
+                    </ButtonLink>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
           <div class="service-summary">

@@ -12,13 +12,18 @@ const contact: ContactInfo = {
   facebookUrl: "https://www.facebook.com/kccfministries",
 };
 
-const social: SocialLink[] = [{ label: "Facebook", href: contact.facebookUrl }];
-
 const youtube: YoutubeChannel = {
   channelId: "UCRNGCZhVNV2Pj80fs20GNog",
   channelUrl: "https://www.youtube.com/@kccfministries1579",
   playlistId: "",
 };
+
+const social: SocialLink[] = [
+  { label: "Facebook", href: contact.facebookUrl, icon: "facebook", handle: "@kccfministries" },
+  { label: "YouTube", href: youtube.channelUrl, icon: "youtube", handle: "@kccfministries1579" },
+  { label: "TikTok", href: "https://www.tiktok.com/@kccf.ministries", icon: "tiktok", handle: "@kccf.ministries" },
+  { label: "Instagram", href: "https://www.instagram.com/kccf__ministries", icon: "instagram", handle: "@kccf__ministries" },
+];
 
 const navItems: NavItem[] = [
   { label: "Home", href: "/" },
@@ -118,10 +123,25 @@ const leadershipSrcset = [
 ].join(", ");
 
 const sermonsSrcset = [
-  "/static/images/bishop1-640.jpg 640w",
-  "/static/images/bishop1-1024.jpg 1024w",
-  "/static/images/bishop1-1600.jpg 1600w",
-  "/static/images/bishop1.jpg 2048w",
+  "/static/images/sermon-640.jpg 640w",
+  "/static/images/sermon-1024.jpg 1024w",
+  "/static/images/sermon-1600.jpg 1600w",
+  "/static/images/sermon-2048.jpg 2048w",
+  "/static/images/sermon.jpg",
+].join(", ");
+
+const ourStorySrcset = [
+  "/static/images/our_story-640.jpg 640w",
+  "/static/images/our_story-1024.jpg 1024w",
+  "/static/images/our_story-1600.jpg 1600w",
+  "/static/images/our_story.jpg 2048w",
+].join(", ");
+
+const eventSrcset = [
+  "/static/images/event-640.jpg 640w",
+  "/static/images/event-1024.jpg 1024w",
+  "/static/images/event-1600.jpg 1600w",
+  "/static/images/event.jpg 2048w",
 ].join(", ");
 
 const imageAssetMap = {
@@ -205,6 +225,22 @@ const imageAssetMap = {
     srcset: sermonsSrcset,
     sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
   },
+  ourStory: {
+    src: "/static/images/our_story.jpg",
+    width: 2048,
+    height: 1365,
+    alt: "Members of the congregation worshipping during a Sunday service",
+    srcset: ourStorySrcset,
+    sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
+  },
+  event: {
+    src: "/static/images/event.jpg",
+    width: 2048,
+    height: 1365,
+    alt: "Members of the congregation worshipping during a Sunday service",
+    srcset: eventSrcset,
+    sizes: "(min-width: 64rem) 38rem, (min-width: 48rem) 45vw, 92vw",
+  },
 } satisfies Record<string, ImageAsset>;
 
 export const imageAssets: Record<keyof typeof imageAssetMap, ImageAsset> = imageAssetMap;
@@ -258,6 +294,8 @@ export const site = {
     brotherFemi: imageAssets.brotherFemi.src,
     leadership: imageAssets.leadership.src,
     sermon: imageAssets.sermon.src,
+    ourStory: imageAssets.ourStory.src,
+    event: imageAssetMap.event.src,
   },
   imageAssets,
 };

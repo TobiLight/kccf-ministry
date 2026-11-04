@@ -1783,7 +1783,7 @@ section {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .service-grid, .event-service-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .beliefs-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1799,9 +1799,6 @@ section {
   }
 }
 @media (min-width: 48rem) {
-  .service-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .welcome-grid, .story-grid, .calling-grid, .contact-details-grid, .contact-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1832,9 +1829,6 @@ section {
   }
 }
 @media (min-width: 64rem) {
-  .service-grid  {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
   .beliefs-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }

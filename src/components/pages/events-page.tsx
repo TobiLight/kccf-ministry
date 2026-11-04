@@ -14,7 +14,7 @@ export function EventsPage() {
         eyebrow="Gather with us"
         title="Events"
         description="Come worship with us, grow in the Word, and make room for God to renew your heart."
-        image={site.images.prayerFellowship}
+        image={site.images.event}
       />
 
       <section class="regular-services-section section-cream" aria-labelledby="regular-services-title">

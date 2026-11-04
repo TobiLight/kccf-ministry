@@ -27,9 +27,13 @@ export type ContactInfo = {
   facebookUrl: string;
 };
 
+export type SocialNetwork = "facebook" | "youtube" | "tiktok" | "instagram";
+
 export type SocialLink = {
   label: string;
   href: string;
+  icon: SocialNetwork;
+  handle: string;
 };
 
 export type Ministry = {

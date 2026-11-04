@@ -14,7 +14,7 @@ function requireImageAsset(src: string) {
   return asset;
 }
 
-const worshipMomentAsset = requireImageAsset(site.images.worshipMoment);
+const ourStoryAsset = requireImageAsset(site.images.ourStory);
 
 const beliefs = [
   { title: "The Bible", text: "We believe Biblical truth is trustworthy and the foundation of faith and life." },
@@ -88,8 +88,8 @@ export function AboutPage() {
           <div class="story-image-wrap">
             <img
               class="editorial-image"
-              {...getImageSource(site.images.worshipMoment, "(min-width: 48rem) 50vw, 92vw")}
-              alt={worshipMomentAsset.alt}
+              {...getImageSource(site.images.ourStory, "(min-width: 48rem) 50vw, 92vw")}
+              alt={ourStoryAsset.alt}
               loading="lazy"
             />
             <div class="image-caption">Rooted in grace</div>
